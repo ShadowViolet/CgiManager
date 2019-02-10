@@ -1,4 +1,4 @@
-/* cgicTempDir is the only setting you are likely to need
+﻿/* cgicTempDir is the only setting you are likely to need
 	to change in this file. */
 
 /* Used only in Unix environments, in conjunction with mkstemp(). 
@@ -126,7 +126,7 @@ static int unitTest();
 int main(int argc, char *argv[]) {
 	int result;
 	char *cgiContentLengthString;
-	char *e = "";
+	char *e;
 	cgiSetupConstants();
 	cgiGetenv(&cgiServerSoftware, "SERVER_SOFTWARE");
 	cgiGetenv(&cgiServerName, "SERVER_NAME");
@@ -145,16 +145,14 @@ int main(int argc, char *argv[]) {
 	cgiGetenv(&cgiRemoteIdent, "REMOTE_IDENT");
 	/* 2.0: the content type string needs to be parsed and modified, so
 		copy it to a buffer. */
-
 	e = getenv("CONTENT_TYPE");
-	//getenv_s((size_t*)strlen(e) +1, e, 1024, "CONTENT_TYPE");
 	if (e) {
 		if (strlen(e) < sizeof(cgiContentTypeData)) {
-			strcpy_s(cgiContentType, strlen(e) +1, e);
+			strcpy(cgiContentType, e);
 		} else {
 			/* Truncate safely in the event of what is almost certainly
 				a hack attempt */
-			strncpy_s(cgiContentType, strlen(e) +1,e, sizeof(cgiContentTypeData));
+			strncpy(cgiContentType, e, sizeof(cgiContentTypeData));
 			cgiContentType[sizeof(cgiContentTypeData) - 1] = '\0';
 		}
 	} else {
@@ -305,10 +303,6 @@ int main(int argc, char *argv[]) {
 
 static void cgiGetenv(char **s, char *var){
 	*s = getenv(var);
-	/*char* e = "";
-	getenv_s(0, e, 0, var);
-	s = &e;*/
-
 	if (!(*s)) {
 		*s = "";
 	}
@@ -544,7 +538,7 @@ static cgiParseResultType cgiParsePostMultipartInput() {
 			if (getTempFileName(tfileName) != cgiParseSuccess) {
 				return cgiParseIO;
 			}	
-			fopen_s(&outf, tfileName, "w+b");
+			outf = fopen(tfileName, "w+b");
 		} else {
 			outf = 0;
 			tfileName[0] = '\0';
@@ -554,7 +548,7 @@ static cgiParseResultType cgiParsePostMultipartInput() {
 			/* Lack of a boundary here is an error. */
 			if (outf) {
 				fclose(outf);
-				_unlink(tfileName);
+				unlink(tfileName);
 			}
 			if (out) {
 				free(out);
@@ -573,7 +567,7 @@ static cgiParseResultType cgiParsePostMultipartInput() {
 		if (!n->attr) {
 			goto outOfMemory;
 		}
-		strcpy_s(n->attr, strlen(fname) + 1, fname);
+		strcpy(n->attr, fname);
 		if (out) {
 			n->value = out;
 			out = 0;
@@ -596,20 +590,20 @@ static cgiParseResultType cgiParsePostMultipartInput() {
 		if (!n->fileName) {
 			goto outOfMemory;
 		}
-		strcpy_s(n->fileName, strlen(ffileName) +1, ffileName);
+		strcpy(n->fileName, ffileName);
 		n->contentType = (char *) malloc(strlen(fcontentType) + 1);
 		if (!n->contentType) {
 			goto outOfMemory;
 		}
-		strcpy_s(n->contentType, strlen(fcontentType) +1, fcontentType);
+		strcpy(n->contentType, fcontentType);
 		n->tfileName = (char *) malloc(strlen(tfileName) + 1);
 		if (!n->tfileName) {
 			goto outOfMemory;
 		}
-		strcpy_s(n->tfileName, strlen(tfileName) +1, tfileName);
+		strcpy(n->tfileName, tfileName);
 
-		l = n;
-	}
+		l = n;			
+	}	
 	return cgiParseSuccess;
 outOfMemory:
 	if (n) {
@@ -635,7 +629,7 @@ outOfMemory:
 	}
 	if (outf) {
 		fclose(outf);
-		_unlink(tfileName);
+		unlink(tfileName);
 	}
 	return cgiParseMemory;
 }
@@ -660,12 +654,12 @@ static cgiParseResultType getTempFileName(char *tfileName)
 	close(outfd);
 	/* Fix the permissions */
 	if (chmod(tfileName, 0600) != 0) {
-		_unlink(tfileName);
+		unlink(tfileName);
 		return cgiParseIO;
 	}
 #else
 	/* Non-Unix. Do what we can. */
-	if (!tmpnam_s(tfileName, strlen(tfileName) +1)) {
+	if (!tmpnam(tfileName)) {
 		return cgiParseIO;
 	}
 #endif
@@ -728,7 +722,7 @@ cgiParseResultType afterNextBoundary(mpStreamPtr mpp, FILE *outf, char **outP,
 		}
 	}
 	boffset = 0;
-	sprintf_s(workingBoundaryData, strlen(workingBoundaryData) +1, "\r\n--%s", cgiMultipartBoundary);
+	sprintf(workingBoundaryData, "\r\n--%s", cgiMultipartBoundary);
 	if (first) {
 		workingBoundary = workingBoundaryData + 2;
 	}
@@ -1185,7 +1179,7 @@ static void cgiFreeResources() {
 		free(c->fileName);
 		free(c->contentType);
 		if (strlen(c->tfileName)) {
-			_unlink(c->tfileName);
+			unlink(c->tfileName);
 		}
 		free(c->tfileName);
 		free(c);
@@ -1231,7 +1225,7 @@ cgiFormResultType cgiFormString(
 	cgiFormEntry *e;
 	e = cgiFormEntryFindFirst(name);
 	if (!e) {
-		strcpy_s(result, 1, "");
+		strcpy(result, "");
 		return cgiFormNotFound;
 	}
 	return cgiFormEntryString(e, result, max, 1);
@@ -1245,7 +1239,7 @@ cgiFormResultType cgiFormFileName(
 	char *s;
 	e = cgiFormEntryFindFirst(name);
 	if (!e) {
-		strcpy_s(result, 1, "");
+		strcpy(result, "");
 		return cgiFormNotFound;
 	}
 	s = e->fileName;
@@ -1341,7 +1335,7 @@ cgiFormResultType cgiFormFileOpen(
 		*cfpp = 0;
 		return cgiFormMemory;
 	}
-	fopen_s(&cfp->in, e->tfileName, "rb");
+	cfp->in = fopen(e->tfileName, "rb");
 	if (!cfp->in) {
 		free(cfp);
 		return cgiFormIO;
@@ -1381,7 +1375,7 @@ cgiFormResultType cgiFormStringNoNewlines(
 	cgiFormEntry *e;
 	e = cgiFormEntryFindFirst(name);
 	if (!e) {
-		strcpy_s(result, 1, "");
+		strcpy(result, "");
 		return cgiFormNotFound;
 	}
 	return cgiFormEntryString(e, result, max, 0);
@@ -1429,7 +1423,7 @@ cgiFormResultType cgiFormStringMultiple(
 				*result = 0;
 				return cgiFormMemory;
 			}	
-			strcpy_s(stringArray[i], strlen(e->value) +1, e->value);
+			strcpy(stringArray[i], e->value);
 			cgiFormEntryString(e, stringArray[i], max, 1);
 			i++;
 		} while ((e = cgiFormEntryFindNext()) != 0); 
@@ -1762,6 +1756,7 @@ cgiFormResultType cgiCookieString(
 				p++;
 				space--;
 			}
+
 			if (space > 0) {
 				*value = '\0';
 			}
@@ -1824,7 +1819,7 @@ void cgiHeaderCookieSetInteger(char *name, int value, int secondsToLive,
 	char *path, char *domain)
 {
 	char svalue[256];
-	sprintf_s(svalue, strlen(svalue) +1, "%d", value);
+	sprintf(svalue, "%d", value);
 	cgiHeaderCookieSetString(name, svalue, secondsToLive, path, domain);
 }
 
@@ -1871,7 +1866,7 @@ void cgiHeaderCookieSetString(char *name, char *value, int secondsToLive,
 	struct tm *gt;
 	time(&now);
 	then = now + secondsToLive;
-	gmtime_s(gt, &then);
+	gt = gmtime(&then);
 	fprintf(cgiOut, 
 		"Set-Cookie: %s=%s; domain=%s; expires=%s, %02d-%s-%04d %02d:%02d:%02d GMT; path=%s\r\n",
 		name, value, domain, 
@@ -1907,7 +1902,7 @@ cgiEnvironmentResultType cgiWriteEnvironment(char *filename) {
 	FILE *out;
 	cgiFormEntry *e;
 	/* Be sure to open in binary mode */
-	fopen_s(&out, filename, "wb");
+	out = fopen(filename, "wb");
 	if (!out) {
 		/* Can't create file */
 		return cgiEnvironmentIO;
@@ -2029,7 +2024,7 @@ error:
 	/* If this function is not defined in your system,
 		you must substitute the appropriate 
 		file-deletion function. */
-	_unlink(filename);
+	unlink(filename);
 	return cgiEnvironmentIO;
 }
 
@@ -2062,7 +2057,7 @@ cgiEnvironmentResultType cgiReadEnvironment(char *filename) {
 	/* Free any existing data first */
 	cgiFreeResources();
 	/* Be sure to open in binary mode */
-	fopen_s(&in, filename, "rb");
+	in = fopen(filename, "rb");
 	if (!in) {
 		/* Can't access file */
 		return cgiEnvironmentIO;
@@ -2184,10 +2179,10 @@ cgiEnvironmentResultType cgiReadEnvironment(char *filename) {
 				result = cgiEnvironmentIO;
 				goto error;
 			}
-			fopen_s(&out, tfileName, "w+b");
+			out = fopen(tfileName, "w+b");
 			if (!out) {
 				result = cgiEnvironmentIO;
-				_unlink(tfileName);
+				unlink(tfileName);
 				goto error;
 			}
 			while (len > 0) {		
@@ -2202,13 +2197,13 @@ cgiEnvironmentResultType cgiReadEnvironment(char *filename) {
 				if (got <= 0) {
 					result = cgiEnvironmentIO;
 					fclose(out);
-					_unlink(tfileName);
+					unlink(tfileName);
 					goto error;
 				}
 				if (((int) fwrite(buffer, 1, got, out)) != got) {
 					result = cgiEnvironmentIO;
 					fclose(out);
-					_unlink(tfileName);
+					unlink(tfileName);
 					goto error;
 				}
 				len -= got;
@@ -2218,10 +2213,10 @@ cgiEnvironmentResultType cgiReadEnvironment(char *filename) {
 			e->tfileName = (char *) malloc((int) strlen(tfileName) + 1);
 			if (!e->tfileName) {
 				result = cgiEnvironmentMemory;
-				_unlink(tfileName);
+				unlink(tfileName);
 				goto error;
 			}
-			strcpy_s(e->tfileName, strlen(tfileName) +1,tfileName);
+			strcpy(e->tfileName, tfileName);
 		} else {
 			e->tfileName = (char *) malloc(1);
 			if (!e->tfileName) {
@@ -2479,7 +2474,7 @@ skipSecondValue:
 			*result = 0;
 			return cgiFormMemory;
 		}	
-		strcpy_s(stringArray[i], strlen(e->attr) +1,e->attr);
+		strcpy(stringArray[i], e->attr);
 		i++;
 skipSecondValue2:
 		e = e->next;

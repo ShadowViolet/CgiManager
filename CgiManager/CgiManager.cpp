@@ -1,25 +1,46 @@
-#include "StdAfx.h"
-#include "CgiManager.h"
+ï»¿#include "CgiManager.h"
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <algorithm>
-#include <cstring>
-using namespace std;
+// é™æ€æˆå‘˜åˆå§‹åŒ–
+bool   CCgiManager::debug              = false;
+string CCgiManager::error_message      = "é¡µé¢é”™è¯¯ï¼è¯·ç¨åå†è¯•ï½";
+string CCgiManager::log_path           = "log";
+string CCgiManager::charset            = "";
+string CCgiManager::return_type        = "text/html";
+string CCgiManager::ajax_return        = "json";
+string CCgiManager::controller_prefix  = "C";
+string CCgiManager::controller_suffix  = "";
+string CCgiManager::default_controller = "CIndex";
+string CCgiManager::default_action     = "index";
+string CCgiManager::action_suffix      = "";
+string CCgiManager::pathinfo_depr      = "/";
+string CCgiManager::html_suffix        = "html";
+bool   CCgiManager::url_route          = true;
+int    CCgiManager::cookie_expire      = 86400;
+string CCgiManager::cookie_path        = "/";
+string CCgiManager::cookie_domain      = "localhost";
 
+bool CCgiManager::Initialized  = false;
+bool CCgiManager::IsSetHead    = false;
 
-// ¾²Ì¬³ÉÔ±³õÊ¼»¯
-bool CCgiManager::IsSetHead = false;
-int CModel::Type = 0;
+string CCgiManager::Controller = "";
+string CCgiManager::Function   = "";
 
+vector<string> CCgiManager::routes;
+map <string, map<string, PtrFun> > CCgiManager::FunTab;
 
-/* ÅäÖÃÎÄ¼şÀà***********************************************************************************************************************************************************************************
- * ÓÃÍ¾£º¶ÁĞ´ÅäÖÃÎÄ¼ş
+map <string, int>    CController::IntegerMap;
+map <string, string> CController::StringMap;
+map <string, double> CController::DoubleMap;
+map <string, vector<string> > CController::ListMap;
+
+int  CModel::Type       = 0;
+bool CModel::Initialize = false;
+
+/* é…ç½®æ–‡ä»¶ç±»***********************************************************************************************************************************************************************************
+ * ç”¨é€”ï¼šè¯»å†™é…ç½®æ–‡ä»¶
  */
 
-CConfig::CConfig( string filename, string delimiter,  
-               string comment )  
+CConfig::CConfig( string filename, string delimiter, string comment )  
                : m_Delimiter(delimiter), m_Comment(comment)  
 {  
     // Construct a CConfig, getting keys and values from given file  
@@ -30,8 +51,7 @@ CConfig::CConfig( string filename, string delimiter,
   
     in >> (*this);  
 }  
-  
-  
+
 CConfig::CConfig()  
 : m_Delimiter( string(1,'=') ), m_Comment( string(1,'#') )  
 {  
@@ -153,8 +173,7 @@ bool CConfig::FileExist(std::string filename)
     return exist;  
 }  
   
-void CConfig::ReadFile( string filename, string delimiter,  
-                      string comment )  
+void CConfig::ReadFile( string filename, string delimiter, string comment )  
 {  
     m_Delimiter = delimiter;  
     m_Comment = comment;  
@@ -166,24 +185,155 @@ void CConfig::ReadFile( string filename, string delimiter,
 }  
 
 
+/* static */  
+template<class T>  
+std::string CConfig::T_as_string( const T& t )  
+{  
+    // Convert from a T to a string  
+    // Type T must support << operator  
+    std::ostringstream ost;  
+    ost << t;  
+    return ost.str();  
+}  
+  
+  
+/* static */  
+template<class T>  
+T CConfig::string_as_T( const std::string& s )  
+{  
+    // Convert from a string to a T  
+    // Type T must support >> operator  
+    T t;  
+    std::istringstream ist(s);  
+    ist >> t;  
+    return t;  
+}  
+  
+  
+/* static */  
+template<>  
+inline std::string CConfig::string_as_T<std::string>( const std::string& s )  
+{  
+    // Convert from a string to a string  
+    // In other words, do nothing  
+    return s;  
+}  
+  
+  
+/* static */  
+template<>  
+inline bool CConfig::string_as_T<bool>( const std::string& s )  
+{  
+    // Convert from a string to a bool  
+    // Interpret "false", "F", "no", "n", "0" as false  
+    // Interpret "true", "T", "yes", "y", "1", "-1", or anything else as true  
+    bool b = true;  
+    std::string sup = s;  
+    for( std::string::iterator p = sup.begin(); p != sup.end(); ++p )  
+        *p = toupper(*p);  // make string all caps  
+    if( sup==std::string("FALSE") || sup==std::string("F") ||  
+        sup==std::string("NO") || sup==std::string("N") ||  
+        sup==std::string("0") || sup==std::string("NONE") )  
+        b = false;  
+    return b;  
+}  
+  
+  
+template<class T>  
+T CConfig::Read( const std::string& key ) const  
+{  
+    // Read the value corresponding to key  
+    mapci p = m_Contents.find(key);  
+    if( p == m_Contents.end() ) throw Key_not_found(key);  
+    return string_as_T<T>( p->second );  
+}  
+  
+  
+template<class T>  
+T CConfig::Read( const std::string& key, const T& value ) const  
+{  
+    // Return the value corresponding to key or given default value  
+    // if key is not found  
+    mapci p = m_Contents.find(key);  
+    if( p == m_Contents.end() ) return value;  
+    return string_as_T<T>( p->second );  
+}  
+  
+  
+template<class T>  
+bool CConfig::ReadInto( T& var, const std::string& key ) const  
+{  
+    // Get the value corresponding to key and store in var  
+    // Return true if key is found  
+    // Otherwise leave var untouched  
+    mapci p = m_Contents.find(key);  
+    bool found = ( p != m_Contents.end() );  
+    if( found ) var = string_as_T<T>( p->second );  
+    return found;  
+}  
+  
+  
+template<class T>  
+bool CConfig::ReadInto( T& var, const std::string& key, const T& value ) const  
+{  
+    // Get the value corresponding to key and store in var  
+    // Return true if key is found  
+    // Otherwise set var to given default  
+    mapci p = m_Contents.find(key);  
+    bool found = ( p != m_Contents.end() );  
+    if( found )  
+        var = string_as_T<T>( p->second );  
+    else  
+        var = value;  
+    return found;  
+}  
+  
+  
+template<class T>  
+void CConfig::Add( const std::string& in_key, const T& value )  
+{
+    // Add a key with given value
+    std::string v   = T_as_string( value );
+    std::string key = in_key;
+
+	#ifdef _WIN32
+    trim(key);
+    trim(v);
+	#endif
+
+	#ifdef __linux
+	linux_trim((char*)key.c_str());
+	linux_trim((char*)v.c_str());
+    #endif
+
+    m_Contents[key] = v;  
+    return;
+}
+
+
 /************************************************************************************************************************************************************************************************/
 
 
-/* CGI¸¸Àà***********************************************************************************************************************************************************************************
- * ÓÃÍ¾£º¸÷ÖÖ×î»ù´¡µÄCGI²Ù×÷
+/* CGIçˆ¶ç±»***********************************************************************************************************************************************************************************
+ * ç”¨é€”ï¼šå„ç§æœ€åŸºç¡€çš„CGIæ“ä½œ
  */
 
 CCgiManager::CCgiManager()
 {
-	// Ä¬ÈÏ·µ»ØHTML
-	SetHead("text/html");
-}
+	if(!Initialized)
+	{
+		// CGI é…ç½®
+		Config();
 
+		// è·¯ç”±é…ç½®
+		Route();
 
-CCgiManager::CCgiManager(char * Type)
-{
-	// ·µ»Øtype
-	SetHead(Type);
+		// è§£æUrl
+		ParsingUrl();
+
+		// åˆå§‹åŒ–å®Œæˆ
+		Initialized = true;
+	}
 }
 
 
@@ -192,47 +342,53 @@ CCgiManager::~CCgiManager()
 }
 
 
-/*´Ó×Ö·û´®µÄ×ó±ß½ØÈ¡n¸ö×Ö·û*/  
-char * left(char *dst,char *src, int n)  
+///////////////////////////////////å­—ç¬¦ä¸²æ“ä½œä»£ç ///////////////////////////////////
+
+
+/*ä»å­—ç¬¦ä¸²çš„å·¦è¾¹æˆªå–nä¸ªå­—ç¬¦*/  
+char* CCgiManager::Left(char* dst, char* src, int n)  
 {  
     char *p = src;  
     char *q = dst;  
     int len = strlen(src);  
     if(n>len) n = len;  
     while(n--) *(q++) = *(p++);  
-    *(q++)='\0'; /*ÓĞ±ØÒªÂğ£¿ºÜÓĞ±ØÒª*/  
+    *(q++)='\0'; /*æœ‰å¿…è¦å—ï¼Ÿå¾ˆæœ‰å¿…è¦*/  
     return dst;  
 }  
-  
-/*´Ó×Ö·û´®µÄÖĞ¼ä½ØÈ¡n¸ö×Ö·û*/  
-char * mid(char *dst,char *src, int n,int m) /*nÎª³¤¶È£¬mÎªÎ»ÖÃ*/  
+ 
+
+/*ä»å­—ç¬¦ä¸²çš„ä¸­é—´æˆªå–nä¸ªå­—ç¬¦*/  
+char* CCgiManager::Mid(char* dst, char* src, int n, int m) /*nä¸ºé•¿åº¦ï¼Œmä¸ºä½ç½®*/  
 {  
     char *p = src;  
     char *q = dst;  
     int len = strlen(src);  
-    if(n>len) n = len-m;    /*´ÓµÚm¸öµ½×îºó*/  
-    if(m<0) m=0;    /*´ÓµÚÒ»¸ö¿ªÊ¼*/  
+    if(n>len) n = len-m;    /*ä»ç¬¬mä¸ªåˆ°æœ€å*/  
+    if(m<0) m=0;    /*ä»ç¬¬ä¸€ä¸ªå¼€å§‹*/  
     if(m>len) return NULL;  
     p += m;  
     while(n--) *(q++) = *(p++);  
-    *(q++)='\0'; /*ÓĞ±ØÒªÂğ£¿ºÜÓĞ±ØÒª*/  
-    return dst;  
-}  
-  
-/*´Ó×Ö·û´®µÄÓÒ±ß½ØÈ¡n¸ö×Ö·û*/  
-char * right(char *dst,char *src, int n)  
-{  
-    char *p = src;  
-    char *q = dst;  
-    int len = strlen(src);  
-    if(n>len) n = len;  
-    p += (len-n);   /*´ÓÓÒ±ßµÚn¸ö×Ö·û¿ªÊ¼£¬µ½0½áÊø£¬ºÜÇÉ°¡*/  
-    while(*(q++) = *(p++));  
+    *(q++)='\0'; /*æœ‰å¿…è¦å—ï¼Ÿå¾ˆæœ‰å¿…è¦*/  
     return dst;  
 }  
 
-// ×Ö·û´®·Ö¸î
-void SplitString(const std::string& s, std::vector<std::string>& v, const std::string& c)
+
+/*ä»å­—ç¬¦ä¸²çš„å³è¾¹æˆªå–nä¸ªå­—ç¬¦*/
+char* CCgiManager::Right(char* dst, char* src, int n)
+{
+	char *p = src;
+    char *q = dst;
+    int len = strlen(src);
+    if(n>len) n = len;
+    p += (len-n);   /*ä»å³è¾¹ç¬¬nä¸ªå­—ç¬¦å¼€å§‹ï¼Œåˆ°0ç»“æŸï¼Œå¾ˆå·§å•Š*/
+    while(*(q++) = *(p++));
+    return dst;
+}
+
+
+// å­—ç¬¦ä¸²åˆ†å‰²
+void CCgiManager::Split(const std::string& s, std::vector<std::string>& v, const std::string& c)
 {
   std::string::size_type pos1, pos2;
   pos2 = s.find(c);
@@ -249,7 +405,48 @@ void SplitString(const std::string& s, std::vector<std::string>& v, const std::s
 }
 
 
-// °Ñsource×Ö·û´®ÀïËùÓĞs1×Ö·ûÈ«²¿Ìæ»»³É×Ö·ûs2
+// å­—ç¬¦ä¸²æ›¿æ¢ s1é‡Œæ›¿æ¢s2ä¸s3
+char* CCgiManager::Replace(char* s1, char* s2, char* s3)
+{
+    char *p,*from,*to,*begin=s1;
+    int c1,c2,c3,c;         //ä¸²é•¿åº¦åŠè®¡æ•°
+    c2=strlen(s2);
+    c3=(s3!=NULL)?strlen(s3):0;
+    if(c2==0)return s1;     //æ³¨æ„è¦é€€å‡º
+    while(true)             //æ›¿æ¢æ‰€æœ‰å‡ºç°çš„ä¸²
+    {
+        c1=strlen(begin);
+        p=strstr(begin,s2); //å‡ºç°ä½ç½®
+        if(p==NULL)         //æ²¡æ‰¾åˆ°
+            return s1;
+        if(c2>c3)           //ä¸²å¾€å‰ç§»
+        {
+            from=p+c2;
+            to=p+c3;
+            c=c1-c2+begin-p+1;
+            while(c--)
+                *to++=*from++;
+        }
+        else if(c2<c3)      //ä¸²å¾€åç§»
+        {
+            from=begin+c1;
+            to=from-c2+c3;
+            c=from-p-c2+1;
+            while(c--)
+                *to--=*from--;
+        }
+        if(c3)              //å®Œæˆæ›¿æ¢
+        {
+            from=s3,to=p,c=c3;
+            while(c--)
+                *to++=*from++;
+        }
+        begin=p+c3;         //æ–°çš„æŸ¥æ‰¾ä½ç½®
+    }
+}
+
+
+// æŠŠsourceå­—ç¬¦ä¸²é‡Œæ‰€æœ‰s1å­—ç¬¦å…¨éƒ¨æ›¿æ¢æˆå­—ç¬¦s2
 void replace_char(char *result, char *source, char s1, char s2)
 {
     unsigned i = 0;
@@ -285,189 +482,953 @@ void replace_string(char *result, char *source, char* s1, char *s2)
 }
 
 
-// Ìø×ªµ½ÇëÇó·½·¨
-void CCgiManager::Jump()
+// è½¬å¤§å†™
+char* CCgiManager::strupr(char *str)
 {
-	char* Method = cgiPathInfo;
-	char* Directory, *Controller, *Function;
-
-	// Ä¿±êÁ´±í
-	vector<string> v;
-
-	// Ä¬ÈÏ²ÎÊı(Ã»ÓĞ²ÎÊı)
-	if( strlen(Method) == strlen(cgiScriptName) )
-	{
-		// Ä¬ÈÏÖµ
-		Directory  = "index";
-		Controller = "index";
-		Function   = "index";
-	}
-	else
-	{
-		// ´¦Àí×Ö·û´®
-		right(Method, cgiPathInfo, strlen(cgiPathInfo) - strlen(cgiScriptName));
-
-		// ·Ö¸î´¦Àí
-		SplitString(Method, v, "/");
-
-		// ²âÊÔÊä³ö
-		/*for(vector<string>::size_type i = 0; i != v.size(); ++i)
-		{
-		OutPut((char*)v[i].c_str());
-		}*/
-
-		// ½âÎöÄ¿Â¼Ãû³Æ
-		Directory  = (char*)v[1].c_str();
-
-		// ½âÎö¿ØÖÆÆ÷Ãû³Æ
-		Controller = (char*)v[2].c_str();
-
-		// ½âÎö·½·¨Ãû³Æ
-		Function   = (char*)v[3].c_str();
-
-		// Ä¬ÈÏÄ¿Â¼
-		if(Directory == "" || strlen(Directory) == 0)
-			Directory = "index";
-
-		// Ä¬ÈÏ¿ØÖÆÆ÷
-		if(Controller == "" || strlen(Controller) == 0)
-			Controller = "index";
-
-		// Ä¬ÈÏ·½·¨
-		if(Function == "" || strlen(Function) == 0)
-			Function = "index";
-	}
-
-	// ÖØ¶¨Ïòµ½Ä¿±ê
-	string Target = "/application/" + (string)Directory + "/controller/" + (string)Controller + ".cgi/" + (string)Function;
-	Redirect((char*)Target.c_str());
+	#ifdef _WIN32
+    char *orign=str;
+    for (; *str!='\0'; str++)
+        *str = toupper(*str);
+    return orign;
+	#else
+	string target(str);
+	transform(target.begin(), target.end(), target.begin(), (int (*)(int))toupper);
+	return (char*)target.c_str();
+	 #endif
 }
 
 
-// ÉèÖÃÍ·
-void CCgiManager::SetHead(char * Type)
+// è½¬å°å†™
+char* CCgiManager::strlowr(char *str)
 {
-	cgiHeaderContentType(Type);
+    /*char *orign=str;
+    for (; *str!='\0'; str++)
+        *str = tolower(*str);
+    return orign;*/
+
+	#ifdef _WIN32
+	for (unsigned int i = 0; i < strlen(str); i++)
+    {
+        str[i] = tolower(str[i]);
+    }
+	return str;
+    #else
+	string target(str);
+	transform(target.begin(), target.end(), target.begin(), (int (*)(int))tolower);
+	return (char*)target.c_str();
+    #endif
+}
+
+
+void string_replace( std::string &strBig, const std::string &strsrc, const std::string &strdst)
+{
+    std::string::size_type pos = 0;
+    std::string::size_type srclen = strsrc.size();
+    std::string::size_type dstlen = strdst.size();
+
+    while( (pos=strBig.find(strsrc, pos)) != std::string::npos )
+    {
+        strBig.replace( pos, srclen, strdst );
+        pos += dstlen;
+    }
+} 
+
+
+///////////////////////////////////ç¼–ç ç±»å‹è½¬æ¢ä»£ç ///////////////////////////////////
+
+
+void CCgiManager::Gb2312ToUnicode(wchar_t* pOut,char *gbBuffer)
+{
+    //::MultiByteToWideChar(CP_ACP,MB_PRECOMPOSED,gbBuffer,2,pOut,1);
+	mbstowcs(pOut, gbBuffer, strlen(gbBuffer)*2);
+    return;
+}
+
+
+void CCgiManager::UTF_8ToUnicode(wchar_t* pOut,char *pText)
+{
+    char* uchar = (char *)pOut;
+    
+    uchar[1] = ((pText[0] & 0x0F) << 4) + ((pText[1] >> 2) & 0x0F);
+    uchar[0] = ((pText[1] & 0x03) << 6) + (pText[2] & 0x3F);
+ 
+    return;
+}
+
+
+void CCgiManager::UnicodeToUTF_8(char* pOut,wchar_t* pText)
+{
+    // æ³¨æ„ WCHARé«˜ä½å­—çš„é¡ºåº,ä½å­—èŠ‚åœ¨å‰ï¼Œé«˜å­—èŠ‚åœ¨å
+    char* pchar = (char *)pText;
+ 
+    pOut[0] = (0xE0 | ((pchar[1] & 0xF0) >> 4));
+    pOut[1] = (0x80 | ((pchar[1] & 0x0F) << 2)) + ((pchar[0] & 0xC0) >> 6);
+    pOut[2] = (0x80 | (pchar[0] & 0x3F));
+ 
+    return;
+}
+
+
+void CCgiManager::UnicodeToGB2312(char* pOut,wchar_t* uData)
+{
+    //WideCharToMultiByte(CP_ACP,NULL,&uData,1,pOut,sizeof(WCHAR),NULL,NULL);
+	wcstombs(pOut, uData, wcslen(uData));
+    return;
+}
+
+
+//åšä¸ºè§£Urlä½¿ç”¨
+char CCgiManager::CharToInt(char ch){
+        if(ch>='0' && ch<='9')return (char)(ch-'0');
+        if(ch>='a' && ch<='f')return (char)(ch-'a'+10);
+        if(ch>='A' && ch<='F')return (char)(ch-'A'+10);
+        return -1;
+}
+
+
+char CCgiManager::StrToBin(char *str){
+        char tempWord[2];
+        char chn;
+ 
+        tempWord[0] = CharToInt(str[0]);                         //make the B to 11 -- 00001011
+        tempWord[1] = CharToInt(str[1]);                         //make the 0 to 0 -- 00000000
+ 
+        chn = (tempWord[0] << 4) | tempWord[1];                //to change the BO to 10110000
+ 
+        return chn;
+}
+ 
+
+//UTF_8 è½¬gb2312
+void CCgiManager::UTF_8ToGB2312(string &pOut, char *pText, int pLen)
+{
+     char buf[4];
+     char* rst = new char[pLen + (pLen >> 2) + 2];
+    memset(buf,0,4);
+    memset(rst,0,pLen + (pLen >> 2) + 2);
+ 
+    int i =0;
+    int j = 0;
+     
+    while(i < pLen)
+    {
+        if(*(pText + i) >= 0)
+        {
+           
+            rst[j++] = pText[i++];
+        }
+        else                
+        {
+            wchar_t Wtemp;
+           
+            UTF_8ToUnicode(&Wtemp,pText + i);
+             
+            UnicodeToGB2312(buf,&Wtemp);
+           
+            unsigned short int tmp = 0;
+            tmp = rst[j] = buf[0];
+            tmp = rst[j+1] = buf[1];
+            tmp = rst[j+2] = buf[2];
+ 
+            //newBuf[j] = Ctemp[0];
+            //newBuf[j + 1] = Ctemp[1];
+ 
+            i += 3;   
+            j += 2;  
+        }
+       
+}
+    rst[j]='\0';
+   pOut = rst;
+    delete []rst;
+}
+ 
+
+//GB2312 è½¬ä¸º UTF-8
+void CCgiManager::GB2312ToUTF_8(string& pOut,char *pText, int pLen)
+{
+    char buf[4];
+    memset(buf,0,4);
+ 
+    pOut.clear();
+ 
+    int i = 0;
+    while(i < pLen)
+    {
+        //å¦‚æœæ˜¯è‹±æ–‡ç›´æ¥å¤åˆ¶å°±å¯ä»¥
+        if( pText[i] >= 0)
+        {
+            char asciistr[2]={0};
+            asciistr[0] = (pText[i++]);
+            pOut.append(asciistr);
+        }
+        else
+        {
+            wchar_t pbuffer;
+            Gb2312ToUnicode(&pbuffer,pText+i);
+ 
+            UnicodeToUTF_8(buf,&pbuffer);
+ 
+            pOut.append(buf);
+ 
+            i += 2;
+        }
+    }
+ 
+    return;
+}
+
+
+//æŠŠstrç¼–ç ä¸ºç½‘é¡µä¸­çš„ GB2312 url encode ,è‹±æ–‡ä¸å˜ï¼Œæ±‰å­—åŒå­—èŠ‚ å¦‚%3D%AE%88
+string CCgiManager::UrlGB2312(char * str)
+{
+    string dd;
+    size_t len = strlen(str);
+    for (size_t i=0;i<len;i++)
+    {
+        if(isalnum((BYTE)str[i]))
+        {
+            char tempbuff[2];
+            sprintf(tempbuff,"%c",str[i]);
+            dd.append(tempbuff);
+        }
+        else if (isspace((BYTE)str[i]))
+        {
+            dd.append("+");
+        }
+        else
+        {
+            char tempbuff[4];
+            sprintf(tempbuff,"%%%X%X",((BYTE*)str)[i] >>4,((BYTE*)str)[i] %16);
+            dd.append(tempbuff);
+        }
+ 
+    }
+    return dd;
+}
+ 
+
+//æŠŠstrç¼–ç ä¸ºç½‘é¡µä¸­çš„ UTF-8 url encode ,è‹±æ–‡ä¸å˜ï¼Œæ±‰å­—ä¸‰å­—èŠ‚ å¦‚%3D%AE%88
+ 
+
+string CCgiManager::UrlUTF8(char * str)
+{
+    string tt;
+    string dd;
+    GB2312ToUTF_8(tt,str,(int)strlen(str));
+ 
+    size_t len=tt.length();
+    for (size_t i=0;i<len;i++)
+    {
+        if(isalnum((BYTE)tt.at(i)))
+        {
+            char tempbuff[2]={0};
+            sprintf(tempbuff,"%c",(BYTE)tt.at(i));
+            dd.append(tempbuff);
+        }
+        else if (isspace((BYTE)tt.at(i)))
+        {
+            dd.append("+");
+        }
+        else
+        {
+            char tempbuff[4];
+            sprintf(tempbuff,"%%%X%X",((BYTE)tt.at(i)) >>4,((BYTE)tt.at(i)) %16);
+            dd.append(tempbuff);
+        }
+ 
+    }
+    return dd;
+}
+
+
+//æŠŠurl GB2312è§£ç 
+string CCgiManager::UrlGB2312Decode(string str)
+{
+   string output="";
+        char tmp[2];
+        int i=0,idx=0,len=str.length();
+       
+        while(i<len){
+                if(str[i]=='%'){
+                        tmp[0]=str[i+1];
+                        tmp[1]=str[i+2];
+                        output += StrToBin(tmp);
+                        i=i+3;
+                }
+                else if(str[i]=='+'){
+                        output+=' ';
+                        i++;
+                }
+                else{
+                        output+=str[i];
+                        i++;
+                }
+        }
+       
+        return output;
+}
+
+
+//æŠŠurl utf8è§£ç 
+string CCgiManager::UrlUTF8Decode(string str)
+{
+     string output="";
+ 
+    string temp =UrlGB2312Decode(str);//
+ 
+    UTF_8ToGB2312(output,(char *)temp.data(),strlen(temp.data()));
+ 
+    return output;
+ 
+}
+
+
+//// ACSII   ç¼–ç è½¬ Unicode ç¼–ç   
+//wstring CCgiManager::AcsiiToUnicode(const string  &acsii_string)
+//{
+//	wstring unicode_string;
+//
+//	//CP_ACP - default to ANSI code page  
+//	int len = MultiByteToWideChar(CP_ACP, 0, acsii_string.c_str(), -1, NULL, 0);
+//	if (ERROR_NO_UNICODE_TRANSLATION == len || 0 == len)
+//	{
+//		//return empty wstring
+//		return unicode_string;
+//	}
+//
+//	vector<wchar_t> vec_result(len);
+//	int result_len = MultiByteToWideChar(CP_ACP, 0, acsii_string.c_str(), -1, &vec_result[0], len);
+//	if (result_len != len)
+//	{
+//		//return empty wstring  
+//		return unicode_string;
+//	}
+//
+//	unicode_string = wstring(&vec_result[0]);
+//	return unicode_string;
+//}
+//
+//
+//// ACSII   ç¼–ç è½¬ UTF8    ç¼–ç 
+//string  CCgiManager::AcsiiToUtf8(   const string  &acsii_string)
+//{
+//	wstring unicode_string = AcsiiToUnicode(acsii_string);  //å°† ACSII   ç¼–ç è½¬æ¢ä¸º Unicode  ç¼–ç 
+//	string  utf8_string = UnicodeToUtf8(unicode_string);    //å°† Unicode ç¼–ç è½¬æ¢ä¸º UTF8     ç¼–ç 
+//
+//	// è¿”å›ç¼–ç è½¬æ¢ç»“æœ
+//	return  utf8_string;
+//}
+//
+//
+//// Unicode ç¼–ç è½¬ ACSII   ç¼–ç 
+//string  CCgiManager::UnicodeToAcsii(const wstring &unicode_string)
+//{
+//	string acsii_string;
+//
+//	//CP_OEMCP - default to OEM  code page  
+//	int len = WideCharToMultiByte(CP_OEMCP, 0, unicode_string.c_str(), -1, NULL, 0, NULL, NULL);
+//	if (ERROR_NO_UNICODE_TRANSLATION == len || 0 == len)
+//	{
+//		//return empty wstring  
+//		return acsii_string;
+//	}
+//
+//	vector<char> vec_result(len);
+//	int result_len = WideCharToMultiByte(CP_OEMCP, 0, unicode_string.c_str(), -1, &vec_result[0], len, NULL, NULL);;
+//	if (result_len != len)
+//	{
+//		//return empty wstring  
+//		return acsii_string;
+//	}
+//
+//	acsii_string = string(&vec_result[0]);
+//	return acsii_string;
+//}
+//
+//
+//// Unicode ç¼–ç è½¬ UTF8    ç¼–ç 
+//string  CCgiManager::UnicodeToUtf8( const wstring &unicode_string)
+//{
+//	string utf8_string;
+//
+//	//CP_UTF8 - UTF-8 translation  
+//	int len = WideCharToMultiByte(CP_UTF8, 0, unicode_string.c_str(), -1, NULL, 0, NULL, NULL);
+//	if (0 == len)
+//	{
+//		//return empty wstring  
+//		return utf8_string;
+//	}
+//
+//	vector<char> vec_result(len);
+//	int result_len = WideCharToMultiByte(CP_UTF8, 0, unicode_string.c_str(), -1, &vec_result[0], len, NULL, NULL);;
+//	if (result_len != len)
+//	{
+//		//return empty wstring  
+//		return utf8_string;
+//	}
+//
+//	utf8_string = string(&vec_result[0]);
+//	return utf8_string;
+//}
+//
+//
+//// UTF8    ç¼–ç è½¬ ACSII   ç¼–ç 
+//string  CCgiManager::Utf8ToAcsii(   const string  &utf8_string)
+//{
+//	wstring unicode_string = Utf8ToUnicode(utf8_string);        //å°†UTF8è½¬æ¢ä¸ºUnicode  
+//	string acsii_string = UnicodeToAcsii(unicode_string);   //å°†Unicodeè½¬æ¢ä¸ºACSII  
+//	return acsii_string;
+//}
+//
+//
+//// UTF8    ç¼–ç è½¬ Unicode ç¼–ç 
+//wstring CCgiManager::Utf8ToUnicode( const string  &utf8_string)
+//{
+//	wstring unicode_string;
+//
+//	//CP_UTF8 - UTF-8 translation  
+//	int len = MultiByteToWideChar(CP_UTF8, 0, utf8_string.c_str(), -1, NULL, 0);
+//	if (ERROR_NO_UNICODE_TRANSLATION == len || 0 == len)
+//	{
+//		//return empty wstring  
+//		return unicode_string;
+//	}
+//
+//	vector<wchar_t> vec_result(len);
+//	int result_len = MultiByteToWideChar(CP_UTF8, 0, utf8_string.c_str(), -1, &vec_result[0], len);
+//	if (result_len != len)
+//	{
+//		//return empty wstring  
+//		return unicode_string;
+//	}
+//
+//	unicode_string = wstring(&vec_result[0]);
+//	return unicode_string;
+//}
+
+
+///////////////////////////////////ç±»æˆå‘˜æ–¹æ³•ä»£ç ///////////////////////////////////
+
+
+// è®°å½•é”™è¯¯ä¿¡æ¯
+void CCgiManager::Record(string Content)
+{
+	time_t t;
+    struct tm * lt;
+    time (&t);//è·å–Unixæ—¶é—´æˆ³ã€‚
+    lt = localtime (&t);//è½¬ä¸ºæ—¶é—´ç»“æ„ã€‚
+
+	// å¾—åˆ°æ–‡ä»¶å
+	char name[1024] = {0}, log[1024] = {0};
+	sprintf(name, "%s/%d-%d-%d.log", log_path.c_str(), lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);//è¾“å‡ºç»“æœ
+
+	// è®°å½•çš„æ•°æ®
+	sprintf(log, "%då¹´%dæœˆ%dæ—¥ %dæ—¶%dåˆ†%dç§’: %s\r\n", lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec, Content.c_str());
+
+	#ifdef _WIN32
+	// æ£€æŸ¥è·¯å¾„
+	if (!log_path.empty() && log_path != "" && 0 != _access(log_path.c_str(), 0))
+	{
+		// ç›®æ ‡é“¾è¡¨
+		vector<string> v;
+
+		// åˆ†å‰²å¤„ç†
+		Split(log_path, v, "/");
+
+		// åˆ›å»ºç›®å½•
+		string dir;
+		for(int i = 0; i < (int)v.size(); i++)
+		{
+			dir += v.at(i) + "/";
+
+			// ç›®å½•ä¸å­˜åœ¨ï¼Œåˆ›å»ºç›®å½•
+			_mkdir(dir.c_str());
+		}
+	}
+    #else
+	if (!log_path.empty() && log_path != "" && 0 != access(log_path.c_str(), 0))
+	{
+		// ç›®æ ‡é“¾è¡¨
+		vector<string> v;
+
+		// åˆ†å‰²å¤„ç†
+		Split(log_path, v, "/");
+
+		// åˆ›å»ºç›®å½•
+		string dir;
+		for(int i = 0; i < (int)v.size(); i++)
+		{
+			dir += v.at(i) + "/";
+
+			// ç›®å½•ä¸å­˜åœ¨ï¼Œåˆ›å»ºç›®å½•
+			mkdir(log_path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+		}
+	}
+    #endif;
+
+	// åˆ›å»ºå¹¶è®°å½•
+	FILE *fp = fopen(name, "at");
+	fprintf(fp, log);
+
+	// å…³é—­æ–‡ä»¶
+	fclose(fp);
+}
+
+
+// é…ç½®CGI
+void CCgiManager::Config(string ConfigFile)
+{
+	// æ£€æŸ¥é…ç½®æ–‡ä»¶
+	if(!CConfig::FileExist(ConfigFile))
+	{
+		// è®°å½•
+		Record("application/config.txt ä¸å­˜åœ¨, å°†ä½¿ç”¨é»˜è®¤é…ç½®!");
+	}
+	else
+	{
+		// è¯»å–é…ç½®æ–‡ä»¶
+		CConfig configSettings(ConfigFile);
+
+		// è§£æé…ç½®æ•°æ®
+		debug              = configSettings.Read("debug",              debug);
+		error_message      = configSettings.Read("error_message",      error_message);
+		log_path           = configSettings.Read("log_path",           log_path);
+		charset            = configSettings.Read("charset",            charset);
+		return_type        = configSettings.Read("return_type",        return_type);
+		ajax_return        = configSettings.Read("ajax_return",        ajax_return);
+		controller_prefix  = configSettings.Read("controller_prefix",  controller_prefix);
+		controller_suffix = configSettings.Read("controller_suffix",   controller_suffix);
+		default_controller = configSettings.Read("default_controller", default_controller);
+		default_action     = configSettings.Read("default_action",     default_action);
+		action_suffix      = configSettings.Read("action_suffix",      action_suffix);
+		pathinfo_depr      = configSettings.Read("pathinfo_depr",      pathinfo_depr);
+		html_suffix        = configSettings.Read("html_suffix",        html_suffix);
+		url_route          = configSettings.Read("url_route",          url_route);
+		cookie_expire      = configSettings.Read("cookie_expire",      86400);
+		cookie_path        = configSettings.Read("cookie_path",        cookie_path);
+		cookie_domain      = configSettings.Read("cookie_domain",      cookie_domain);
+	}
+}
+
+
+// é…ç½®è·¯ç”±
+void CCgiManager::Route(string ConfigFile)
+{
+	// å¦‚æœå¼€å¯äº†è·¯ç”±
+	if(url_route)
+	{
+		if(CConfig::FileExist(ConfigFile))
+		{
+			// è¯»å–é…ç½®æ–‡ä»¶
+			CConfig configSettings(ConfigFile);
+
+			// è§£æé…ç½®æ•°æ®
+			string route = configSettings.Read("route", route);
+
+			// å»æ‰å›è½¦ç©ºæ ¼
+			Replace((char*)route.c_str(), "\r", "");
+			Replace((char*)route.c_str(), "\n", "");
+
+			// åˆ†å‰²æ•°æ®
+			Split(route, routes, ":");
+		}
+		else
+		{
+			// è®°å½•
+			Record("application/route.txt ä¸å­˜åœ¨, ä¼ªé™æ€å°†ç¦ç”¨!");
+			url_route = false;
+		}
+	}
+
+	// éå†æ•°æ®
+	/*for(vector<string>::size_type i = 0; i != routes.size(); i++)
+	{
+		OutPut("<br>");
+		OutPut(routes[i]);
+		OutPut("<br>");
+	}*/
+}
+
+
+// è§£æUrl
+void CCgiManager::ParsingUrl()
+{
+	// å®šä¹‰å˜é‡
+	char* Method = cgiPathInfo;
+
+	// ç›®æ ‡é“¾è¡¨
+	vector<string> v;
+
+	// ä¼ªé™æ€åˆ¤æ–­
+	string target = "." + html_suffix;
+	if(strstr(Method, (char*)target.c_str()) != NULL)
+	{
+		if(url_route)
+		{
+			// å¤„ç†å­—ç¬¦ä¸²
+			Replace(Method, (char*)pathinfo_depr.c_str(), "");
+			Replace(Method, (char*)target.c_str(), "");
+
+			vector<string>::iterator it = find(routes.begin(), routes.end(), Method);
+			if (it != routes.end())
+			{
+				int num = it - routes.begin();
+				string Target = routes.at(num+1);
+
+				// åˆ†å‰²å¤„ç†
+				Split(Target, v, pathinfo_depr);
+
+				// è§£ææ§åˆ¶å™¨åç§°
+				Controller = v[0];
+
+				// è§£ææ–¹æ³•åç§°
+				Function   = v[1];
+
+				// åˆ¤æ–­æ˜¯å¦ä¸ºç©º
+				if(Controller.empty() || Function.empty())
+					goto empty;
+			}
+			else
+			{
+				char message[1024] = {0};
+				sprintf(message, "æ‰¾ä¸åˆ°ä¼ªé™æ€%sçš„è·¯ç”±åœ°å€, è¯·åœ¨route.txtä¸­é…ç½®!", Method);
+
+				// è®°å½•æ—¥å¿—
+				Record(message);
+
+				// è¾“å‡ºé”™è¯¯æ¶ˆæ¯
+				DisplayError(message);
+			}
+		}
+		else
+		{
+			// è®°å½•æ—¥å¿—
+			Record("æ²¡æœ‰å¼€å¯è·¯ç”±, ä¼ªé™æ€æ— æ³•ä½¿ç”¨!");
+
+			// è¾“å‡ºé”™è¯¯æ¶ˆæ¯
+			DisplayError("æ²¡æœ‰å¼€å¯è·¯ç”±, ä¼ªé™æ€æ— æ³•ä½¿ç”¨!");
+		}
+	}
+
+	// é»˜è®¤å‚æ•°(æ²¡æœ‰å‚æ•°)
+	#ifdef _WIN32
+	else if( strlen(Method) == strlen(cgiScriptName) || strlen(Method) == 0 && _stricmp(cgiScriptName, "/index.cgi") == 0 )
+	#endif
+
+	#ifdef __linux
+	else if( strlen(Method) == strlen(cgiScriptName) || strlen(Method) == 0 && strcasecmp(cgiScriptName, "/index.cgi") == 0 )
+	#endif
+	{
+		empty:
+
+		// å¤„ç†æ§åˆ¶å™¨åç§°, è½¬ä¸ºå°å†™
+		char* controller = strlowr((char*)default_controller.c_str());
+
+		// åˆ¤æ–­å¹¶å»æ‰å‰ç¼€
+		string temp = controller;
+		int pos = temp.find(strlowr((char*)controller_prefix.c_str()));
+		if(pos == 0 && pos != -1 && controller_prefix.length() > 0)
+			strncpy(controller, controller + controller_prefix.length(), strlen(controller));
+
+		// åˆ¤æ–­å¹¶å»æ‰åç¼€
+		pos = temp.rfind(strlowr((char*)controller_suffix.c_str()));
+		if(pos == 0 && pos != -1 && controller_suffix.length() > 0)
+			controller[strlen(controller) - controller_suffix.length()] = '\0';
+
+		// è·å¾—é»˜è®¤æ§åˆ¶å™¨
+		Controller = controller;
+
+		// å¤„ç†æ–¹æ³•åç§°, è½¬ä¸ºå°å†™
+		char* action = strlowr((char*)default_action.c_str());
+
+		// åˆ¤æ–­å¹¶å»æ‰åç¼€
+		temp = action;
+		pos = temp.rfind(strlowr((char*)action_suffix.c_str()));
+		if(pos == 0 && pos != -1 && action_suffix.length() > 0)
+			action[strlen(action) - action_suffix.length()] = '\0';
+
+		// è·å¾—é»˜è®¤æ–¹æ³•
+		Function = action;
+	}
+
+	// apache æ²¡æœ‰PathInfo
+	else if( strlen(cgiPathInfo) == 0 )
+	{
+		Record("æ— æ³•è·å–PathInfo, è¯·ä¿®æ”¹apacheæœåŠ¡å™¨çš„httpd.confè®¾ç½®ã€‚");
+		DisplayError("æ— æ³•è·å–PathInfo, è¯·ä¿®æ”¹apacheæœåŠ¡å™¨çš„httpd.confè®¾ç½®ã€‚ <br><br>");
+		DisplayError("<Directory /> <br>Options +Indexes +FollowSymLinks +ExecCGI <br>AllowOverride All <br>Order allow,deny <br>Allow from all <br>Require all granted <br>AcceptPathInfo On //åŠ å…¥è¿™è¡Œä»£ç å°±OKäº† <br> </Directory>");
+		return;
+	}
+
+	// è§£æUrl
+	else
+	{
+		string source(Method);
+		string target ="index.cgi";
+		if (source.find(target) < source.length())
+		{
+			// å¤„ç†å­—ç¬¦ä¸²
+			Right(Method, cgiPathInfo, strlen(cgiPathInfo) - strlen(cgiScriptName));
+			//Method[strlen(cgiPathInfo) - strlen(cgiScriptName)] = 0;
+		}
+		else
+		{
+			// apacheæœåŠ¡å™¨æ— éœ€å¤„ç†å­—ç¬¦ä¸²
+		}
+
+		// åˆ†å‰²å¤„ç†
+		Split(Method, v, pathinfo_depr);
+
+		// è§£ææ§åˆ¶å™¨åç§°
+		char* controller = strlowr((char*)v[1].c_str());
+
+		// åˆ¤æ–­å¹¶å»æ‰å‰ç¼€
+		string temp = controller;
+		int pos = temp.find(strlowr((char*)controller_prefix.c_str()));
+		if(pos == 0 && pos != -1 && controller_prefix.length() > 0)
+			strncpy(controller, controller + controller_prefix.length(), strlen(controller));
+
+		// åˆ¤æ–­å¹¶å»æ‰åç¼€
+		pos = temp.rfind(strlowr((char*)controller_suffix.c_str()));
+		if(pos == 0 && pos != -1 && controller_suffix.length() > 0)
+			controller[strlen(controller) - controller_suffix.length()] = '\0';
+
+		// è·å¾—æ§åˆ¶å™¨åç§°
+		Controller = controller;
+
+		// è§£ææ–¹æ³•åç§°
+		char* action = strlowr((char*)v[2].c_str());
+
+		// åˆ¤æ–­å¹¶å»æ‰åç¼€
+		temp = action;
+		pos = temp.rfind(strlowr((char*)action_suffix.c_str()));
+		if(pos == 0 && pos != -1 && action_suffix.length() > 0)
+			action[strlen(action) - action_suffix.length()] = '\0';
+
+		// å¾—åˆ°æ–¹æ³•åç§°
+		Function = action;
+
+		// åˆ¤æ–­æ˜¯å¦ä¸ºç©º
+		if(Controller.empty() || Function.empty())
+			goto empty;
+	}
+}
+
+
+// é”™è¯¯æ˜¾ç¤º
+void CCgiManager::DisplayError(string String, ...)
+{
+	// è®¾ç½®å¤´
+	if(!IsSetHead)
+		SetHead("text/html;charset=" + charset);
+
+	if(debug)
+	{
+		//å¾—åˆ°å˜å‚çš„èµ·å§‹åœ°å€
+		va_list  pArgList;
+		va_start(pArgList, String);
+
+		// å–å€¼å¹¶è¾“å‡ºæ•°æ®
+		char s[65535];
+
+		// æ ¼å¼åŒ–å¹¶è¾“å‡º
+		vsnprintf(s, 65535, String.c_str(), pArgList);
+		vfprintf(cgiOut, s, pArgList);
+
+		//æ”¶å°¾
+		va_end(pArgList);
+	}
+	else
+		fprintf(cgiOut, error_message.c_str());
+}
+
+
+// è®¾ç½®å¤´
+void CCgiManager::SetHead(string Type)
+{
+	cgiHeaderContentType((char*)Type.c_str());
 	IsSetHead = true;
 }
 
 
-// ÉèÖÃLocation
-void CCgiManager::Location(char* Url)
+// è®¾ç½®Location
+void CCgiManager::Location(string Url)
 {
-	cgiHeaderLocation(Url);
+	cgiHeaderLocation((char*)Url.c_str());
 }
 
 
-// ÖØ¶¨ÏòUrl
-void CCgiManager::Redirect(char* Url, bool Visible)
+// Urlè·³è½¬
+void CCgiManager::Jump(string Url, bool Visible)
 {
-	// Url µØÖ·À¸»áÏÔÊ¾¸Ä±ä
+	// Url åœ°å€æ ä¼šæ˜¾ç¤ºæ”¹å˜
 	if(Visible)
-		OutPut("<script>location.href = '%s'</script>", true, Url);
+		OutPut("<script>location.href = '%s'</script>", Url.c_str());
 
-	// Url µØÖ·À¸²»±ä(¿çÓò½«³öÏÖ´íÎó)
+	// Url åœ°å€æ ä¸å˜(è·¨åŸŸå°†å‡ºç°é”™è¯¯)
 	else
 	{
-		string Target = "<script language=javascript> function createXMLHttpRequest(){if(window.XMLHttpRequest){XMLHttpR = new XMLHttpRequest();}else if(window.ActiveXObject){try{XMLHttpR = new ActiveXObject(\"Msxml2.XMLHTTP\");}catch(e){try{XMLHttpR = new ActiveXObject(\"Microsoft.XMLHTTP\");}catch(e){}}}} function sendRequest(url){createXMLHttpRequest();XMLHttpR.open(\"GET\",url,true);XMLHttpR.setRequestHeader(\"Content-Type\",\"text/html;charset=gb2312\");XMLHttpR.onreadystatechange = processResponse;XMLHttpR.send(null);} function processResponse(){if(XMLHttpR.readyState ==4 && XMLHttpR.status == 200){document.write(XMLHttpR.responseText);}}";
+		// document.body.innerHTML 
+		string Target = "<script language=javascript> function createXMLHttpRequest(){if(window.XMLHttpRequest){XMLHttpR = new XMLHttpRequest();}else if(window.ActiveXObject){try{XMLHttpR = new ActiveXObject(\"Msxml2.XMLHTTP\");}catch(e){try{XMLHttpR = new ActiveXObject(\"Microsoft.XMLHTTP\");}catch(e){}}}} function sendRequest(url){createXMLHttpRequest();XMLHttpR.open(\"GET\",url,true);XMLHttpR.setRequestHeader(\"Content-Type\",\"text/html;charset=utf-8\");XMLHttpR.onreadystatechange = processResponse;XMLHttpR.send(null);} function processResponse(){if(XMLHttpR.readyState ==4 && XMLHttpR.status == 200){document.body = XMLHttpR.responseText;document.write(XMLHttpR.responseText);}}";
 		Target += "sendRequest(\"%s\");</script>";
-
-		OutPut((char*)Target.c_str(), true, Url);
+		OutPut(Target.c_str(), Url.c_str());
 	}
 }
 
 
-// Êä³öHTTP´íÎó×´Ì¬´úÂë
-void CCgiManager::SetStatus(int Status, char* Message)
+// è¾“å‡ºHTTPé”™è¯¯çŠ¶æ€ä»£ç 
+void CCgiManager::SetStatus(int Status, string Message)
 {
-	cgiHeaderStatus(Status, Message);
+	cgiHeaderStatus(Status, (char*)Message.c_str());
 }
 
 
-// ×ªÂë²¢Êä³öHtml
-void CCgiManager::HtmlEscape(char * Name, bool Newlines)
+// è½¬ç å¹¶è¾“å‡ºHtml
+void CCgiManager::HtmlEscape(string Name, bool Newlines)
 {
-	cgiHtmlEscape(Name);
-	if(Newlines)
-	    fprintf(cgiOut, "\n");
-}
-
-
-void CCgiManager::HtmlEscapeData(char * Name, int len, bool Newlines)
-{
-	cgiHtmlEscapeData(Name, len);
-	if(Newlines)
-	    fprintf(cgiOut, "\n");
-}
-
-
-// ×ªÂë²¢Êä³öValue
-void CCgiManager::ValueEscape(char * Value, bool Newlines)
-{
-	cgiValueEscape(Value);
-	if(Newlines)
-	    fprintf(cgiOut, "\n");
-}
-
-
-void CCgiManager::ValueEscapeData(char * Value, int len, bool Newlines)
-{
-	cgiValueEscapeData(Value, len);
-	if(Newlines)
-	    fprintf(cgiOut, "\n");
-}
-
-
-// Êä³öÊı¾İ
-void CCgiManager::OutPut(char * String, ...)
-{
-	// ¼ì²éÊÇ·ñÓĞÄ¬ÈÏµÄÍ·
+	// è®¾ç½®é»˜è®¤çš„å¤´
 	if(!IsSetHead)
-		SetHead();
+		SetHead(return_type + ";charset=" + charset);
 
-	//µÃµ½±ä²ÎµÄÆğÊ¼µØÖ·
+	cgiHtmlEscape(Name.c_str());
+	if(Newlines)
+	    fprintf(cgiOut, "\n");
+}
+
+
+void CCgiManager::HtmlEscapeData(string Name, int len, bool Newlines)
+{
+	cgiHtmlEscapeData(Name.c_str(), len);
+	if(Newlines)
+	    fprintf(cgiOut, "\n");
+}
+
+
+// è½¬ç å¹¶è¾“å‡ºValue
+void CCgiManager::ValueEscape(string Value, bool Newlines)
+{
+	// è®¾ç½®é»˜è®¤çš„å¤´
+	if(!IsSetHead)
+		SetHead(return_type + ";charset=" + charset);
+
+	cgiValueEscape(Value.c_str());
+	if(Newlines)
+	    fprintf(cgiOut, "\n");
+}
+
+
+void CCgiManager::ValueEscapeData(string Value, int len, bool Newlines)
+{
+	cgiValueEscapeData(Value.c_str(), len);
+	if(Newlines)
+	    fprintf(cgiOut, "\n");
+}
+
+
+// è¾“å‡ºæ•°æ®
+void CCgiManager::OutPut(string String, ...)
+{
+	// è®¾ç½®é»˜è®¤çš„å¤´
+	if(!IsSetHead)
+		SetHead(return_type + ";charset=" + charset);
+
+	//å¾—åˆ°å˜å‚çš„èµ·å§‹åœ°å€
 	va_list  pArgList;
 	va_start(pArgList, String);
 
-	// È¡Öµ²¢Êä³öÊı¾İ
+	// å–å€¼å¹¶è¾“å‡ºæ•°æ®
 	char s[65535];
 	
-	// ¸ñÊ½»¯²¢Êä³ö
-	vsnprintf(s, 65535, String, pArgList);
+	// æ ¼å¼åŒ–å¹¶è¾“å‡º
+	vsnprintf(s, 65535, String.c_str(), pArgList);
 	vfprintf(cgiOut, s, pArgList);
 
-	//ÊÕÎ²
+	//æ”¶å°¾
 	va_end(pArgList);
 }
 
 
-// »ñÈ¡×Ö·û´®Êı¾İ
-char* CCgiManager::InPutString(char * String, bool OutPut, bool Newlines, int Max)
+// è·å¾—è¾“å…¥å­—ç¬¦
+string CCgiManager::InPut(string String)
 {
-	// ¼ì²éÄ¿±ê×Ö¶ÎÊÇ·ñ´æÔÚ
-	if (cgiFormSubmitClicked(String) == cgiFormSuccess)
+	return InPutString(String);
+}
+
+
+int    CCgiManager::InPut(string String, int    Default)
+{
+	return InPutInteger(String, Default);
+}
+
+
+double CCgiManager::InPut(string String, double Default)
+{
+	return InPutDouble(String, Default);
+}
+
+
+// è·å–å­—ç¬¦ä¸²æ•°æ®
+string CCgiManager::InPutString(string String, bool OutPut, bool Newlines, int Max)
+{
+	// æ£€æŸ¥ç›®æ ‡å­—æ®µæ˜¯å¦å­˜åœ¨
+	char* target = (char*)String.c_str();
+	if (cgiFormSubmitClicked(target) == cgiFormSuccess)
 	{
 		char name[65535];
 
 		if(Max == 0)
-			cgiFormString(String, name, sizeof(String) * 2);
+			cgiFormString((char*)String.c_str(), name, sizeof(String) * 2);
 		else
-			cgiFormString(String, name, Max);
+			cgiFormString((char*)String.c_str(), name, Max);
 
-		// ÅĞ¶ÏÊÇ·ñĞèÒªÊä³ö
+		// èµ‹å€¼
+		string result(name);
+
+		// åˆ¤æ–­æ˜¯å¦éœ€è¦è¾“å‡º
 		if(OutPut)
 		{
-			// ×ªÂë²¢Êä³ö
-			HtmlEscape(name);
+			// è½¬ç å¹¶è¾“å‡º
+			HtmlEscape(result);
 
 			if(Newlines)
 				fprintf(cgiOut, "\n");
 		}
 
-		// ¸³Öµ
-		char* result = name;
+		// è¿”å›
+		return result;
+	}
 
-		// ·µ»Ø
+	return "";
+}
+
+
+// è·å–ä¸å¸¦å›è½¦æ¢è¡Œç¬¦çš„å­—ç¬¦ä¸²æ•°æ®
+string CCgiManager::InPutStringNoNewlines(string String, bool OutPut, bool Newlines, int Max)
+{
+	// æ£€æŸ¥ç›®æ ‡å­—æ®µæ˜¯å¦å­˜åœ¨
+	if (cgiFormSubmitClicked((char*)String.c_str()) == cgiFormSuccess)
+	{
+		char name[65535];
+		if(Max == 0)
+			cgiFormStringNoNewlines((char*)String.c_str(), name, sizeof(String) * 2);
+		else
+			cgiFormStringNoNewlines((char*)String.c_str(), name, Max);
+
+		// èµ‹å€¼
+		string result(name);
+
+		// åˆ¤æ–­æ˜¯å¦éœ€è¦è¾“å‡º
+		if(OutPut)
+		{
+			// è½¬ç å¹¶è¾“å‡º
+			HtmlEscape(result);
+
+			if(Newlines)
+				fprintf(cgiOut, "\n");
+		}
+
+		// è¿”å›
 		return result;
 	}
 
@@ -475,54 +1436,21 @@ char* CCgiManager::InPutString(char * String, bool OutPut, bool Newlines, int Ma
 }
 
 
-// »ñÈ¡²»´ø»Ø³µ»»ĞĞ·ûµÄ×Ö·û´®Êı¾İ
-char* CCgiManager::InPutStringNoNewlines(char * String, bool OutPut, bool Newlines, int Max)
+// è®¾ç½®å­—ç¬¦ä¸²çš„å‚¨å­˜ç©ºé—´ï¼Œéœ€å’ŒInPutStringæˆ–InPutStringNoNewlinesé…åˆä½¿ç”¨
+bool CCgiManager::InPutStringSpaceNeeded(string String, int Length)
 {
-	// ¼ì²éÄ¿±ê×Ö¶ÎÊÇ·ñ´æÔÚ
-	if (cgiFormSubmitClicked(String) == cgiFormSuccess)
-	{
-		char name[65535];
-		if(Max == 0)
-			cgiFormStringNoNewlines(String, name, sizeof(String) * 2);
-		else
-			cgiFormStringNoNewlines(String, name, Max);
-
-		// ÅĞ¶ÏÊÇ·ñĞèÒªÊä³ö
-		if(OutPut)
-		{
-			// ×ªÂë²¢Êä³ö
-			HtmlEscape(name);
-
-			if(Newlines)
-				fprintf(cgiOut, "\n");
-		}
-
-		// ¸³Öµ
-		char* result = name;
-
-		// ·µ»Ø
-		return result;
-	}
-
-	return NULL;
-}
-
-
-// ÉèÖÃ×Ö·û´®µÄ´¢´æ¿Õ¼ä£¬ĞèºÍInPutString»òInPutStringNoNewlinesÅäºÏÊ¹ÓÃ
-bool CCgiManager::InPutStringSpaceNeeded(char * String, int Length)
-{
-	if(cgiFormStringSpaceNeeded(String, &Length) ==  cgiFormSuccess)
+	if(cgiFormStringSpaceNeeded((char*)String.c_str(), &Length) ==  cgiFormSuccess)
 		return true;
 	else 
 		return false;
 }
 
 
-// »ñÈ¡¶ÌÕûĞÍÊı¾İ
-int CCgiManager::InPutInteger(char * String, int Default, bool OutPut, bool Newlines)
+// è·å–çŸ­æ•´å‹æ•°æ®
+int CCgiManager::InPutInteger(string String, int Default, bool OutPut, bool Newlines)
 {
 	int result;
-	cgiFormInteger(String, &result, Default);
+	cgiFormInteger((char*)String.c_str(), &result, Default);
 
 	if(OutPut)
 	{
@@ -536,11 +1464,11 @@ int CCgiManager::InPutInteger(char * String, int Default, bool OutPut, bool Newl
 }
 
 
-// »ñÈ¡¶ÌÕûĞÍÇø¼äÊı¾İ(×î´óÖµÓë×îĞ¡ÖµÎª±ØĞë²ÎÊı)
-int InPutIntegerBound(char* String, int Min, int Max, int Default, bool OutPut, bool Newlines)
+// è·å–çŸ­æ•´å‹åŒºé—´æ•°æ®(æœ€å¤§å€¼ä¸æœ€å°å€¼ä¸ºå¿…é¡»å‚æ•°)
+int CCgiManager::InPutIntegerBound(string String, int Min, int Max, int Default, bool OutPut, bool Newlines)
 {
 	int result;
-	cgiFormIntegerBounded(String, &result, Min, Max, Default);
+	cgiFormIntegerBounded((char*)String.c_str(), &result, Min, Max, Default);
 
 	if(OutPut)
 	{
@@ -554,15 +1482,15 @@ int InPutIntegerBound(char* String, int Min, int Max, int Default, bool OutPut, 
 }
 
 
-// »ñÈ¡Ë«¾«¶ÈÊı¾İ
-double InPutDouble(char * String, int Default, bool OutPut, bool Newlines)
+// è·å–åŒç²¾åº¦æ•°æ® (ä¿ç•™2ä½å°æ•°)
+double CCgiManager::InPutDouble(string String, double Default, bool OutPut, bool Newlines)
 {
 	double result;
-	cgiFormDouble(String, &result, Default);
+	cgiFormDouble((char*)String.c_str(), &result, Default);
 
 	if(OutPut)
 	{
-		fprintf(cgiOut, "%f", result);
+		fprintf(cgiOut, "%.2lf", result);
 
 		if(Newlines)
 			fprintf(cgiOut, "\n");
@@ -572,15 +1500,15 @@ double InPutDouble(char * String, int Default, bool OutPut, bool Newlines)
 }
 
 
-// »ñÈ¡Ë«¾«¶ÈÇø¼äÊı¾İ(×î´óÖµÓë×îĞ¡ÖµÎª±ØĞë²ÎÊı)
-double CCgiManager::InPutDoubleBound(char * String, double Min, double Max, double Default, bool OutPut, bool Newlines)
+// è·å–åŒç²¾åº¦åŒºé—´æ•°æ®(æœ€å¤§å€¼ä¸æœ€å°å€¼ä¸ºå¿…é¡»å‚æ•°)
+double CCgiManager::InPutDoubleBound(string String, double Min, double Max, double Default, bool OutPut, bool Newlines)
 {
 	double result;
-	cgiFormDoubleBounded(String, &result, Min, Max, Default);
+	cgiFormDoubleBounded((char*)String.c_str(), &result, Min, Max, Default);
 
 	if(OutPut)
 	{
-		fprintf(cgiOut, "%f", result);
+		fprintf(cgiOut, "%.2lf", result);
 
 		if(Newlines)
 			fprintf(cgiOut, "\n");
@@ -590,54 +1518,57 @@ double CCgiManager::InPutDoubleBound(char * String, double Min, double Max, doub
 }
 
 
-// »ñÈ¡µ¥¸öCheckboxÊı¾İ(·µ»ØÊÇ·ñÑ¡ÖĞ)
-bool CCgiManager::InPutCheckboxSingle(char * String)
+// è·å–å•ä¸ªCheckboxæ•°æ®(è¿”å›æ˜¯å¦é€‰ä¸­)
+bool CCgiManager::InPutCheckboxSingle(string String)
 {
-	if (cgiFormCheckboxSingle(String) == cgiFormSuccess)
+	if (cgiFormCheckboxSingle((char*)String.c_str()) == cgiFormSuccess)
 		return true;
 	else
 		return false;
 }
 
 
-// »ñÈ¡Ò»×éCheckboxÊı¾İ(·µ»ØËùÓĞÑ¡ÖĞÏî£¬ÈôÎŞÑ¡ÖĞÏîÔò·µ»Ø¿Õ)
-char * CCgiManager::InPutCheckboxMultiple(char * String)
+// è·å–ä¸€ç»„Checkboxæ•°æ®(è¿”å›æ‰€æœ‰é€‰ä¸­é¡¹ï¼Œè‹¥æ— é€‰ä¸­é¡¹åˆ™è¿”å›ç©º)
+string CCgiManager::InPutCheckboxMultiple(string String)
 {
 	char **responses;
-	if (cgiFormStringMultiple(String, &responses) == cgiFormNotFound) 
+	if (cgiFormStringMultiple((char*)String.c_str(), &responses) == cgiFormNotFound) 
 		return NULL;
 	else
 	{
-		// ¸³Öµ
-		char** result = responses;
+		// èµ‹å€¼
+		//char** result = responses;
+		string result((char*)responses);
 
-		// ÊÍ·Å¶ÔÏó
+		// é‡Šæ”¾å¯¹è±¡
 		cgiStringArrayFree(responses);
 
-		// ·µ»Ø
-		return *result;
+		// è¿”å›
+		//return *result;
+		return result;
 	}
 }
 
 
-// »ñÈ¡Ò»×éµ¥Ñ¡SelectÊı¾İ(·µ»ØÑ¡ÖĞµÄÏî)
-char* CCgiManager::InPutSelectSingle(char * String, char *texts[], int total, int Default)
+// è·å–ä¸€ç»„å•é€‰Selectæ•°æ®(è¿”å›é€‰ä¸­çš„é¡¹)
+string CCgiManager::InPutSelectSingle(string String, string texts[], int total, int Default)
 {
 	int Choice;
-	cgiFormSelectSingle(String, texts, total, &Choice, Default);
+	cgiFormSelectSingle((char*)String.c_str(), (char**)texts[Choice].c_str(), total, &Choice, Default);
 	
-	char* result = texts[Choice];
+	//char* result = texts[Choice];
+	string result(texts[Choice]);
 	return result;
 }
 
 
-// »ñÈ¡Ò»×é¶àÑ¡SelectÊı¾İ(ÈôÃ»ÓĞÑ¡ÖĞÈÎºÎÏîÔò·µ»Ø¼Ù£¬·ñÔò·µ»ØÕæ)
-bool CCgiManager::InPutSelectMultiple(char * String, vector<char> &pResult, char *texts[], int total, int Invalid)
+// è·å–ä¸€ç»„å¤šé€‰Selectæ•°æ®(è‹¥æ²¡æœ‰é€‰ä¸­ä»»ä½•é¡¹åˆ™è¿”å›å‡ï¼Œå¦åˆ™è¿”å›çœŸ)
+bool CCgiManager::InPutSelectMultiple(string String, vector<string> &pResult, string texts[], int total, int Invalid)
 {
 	int Choices[65535];
 
-	//Ã»ÓĞÑ¡ÔñÈÎºÎÏî
-	if (cgiFormSelectMultiple(String, texts, total, Choices, &Invalid) == cgiFormNotFound) 
+	//æ²¡æœ‰é€‰æ‹©ä»»ä½•é¡¹
+	if (cgiFormSelectMultiple((char*)String.c_str(), (char**)texts[0].c_str(), total, Choices, &Invalid) == cgiFormNotFound) 
 	{
 		return false;
 	}
@@ -647,8 +1578,8 @@ bool CCgiManager::InPutSelectMultiple(char * String, vector<char> &pResult, char
 		{
 			if (Choices[i]) 
 			{
-				char* result = texts[i];
-				pResult.push_back((char)result);
+				string result(texts[i]);
+				pResult.push_back(result);
 			}
 		}
 		return true;
@@ -656,105 +1587,106 @@ bool CCgiManager::InPutSelectMultiple(char * String, vector<char> &pResult, char
 }
 
 
-// »ñÈ¡Ò»×éRadioÊı¾İ(·µ»ØÑ¡ÖĞµÄÏî)
-char* CCgiManager::InPutRadio(char * String, char *Texts[], int Total, int Default)
+// è·å–ä¸€ç»„Radioæ•°æ®(è¿”å›é€‰ä¸­çš„é¡¹)
+string CCgiManager::InPutRadio(string String, string Texts[], int Total, int Default)
 {
 	int Choice;
-	cgiFormRadio(String, Texts, Total, &Choice, Default);
-	char* result = Texts[Choice];
+	cgiFormRadio((char*)String.c_str(), (char**)Texts[Choice].c_str(), Total, &Choice, Default);
+	string result(Texts[Choice]);
 
 	return result;
 }
 
 
-// »ñÈ¡SubmitÊı¾İ(Ìá½»³É¹¦·µ»ØÕæ·ñÔò·µ»Ø¼Ù)
-bool CCgiManager::SubmitClicked(char * String)
+// è·å–Submitæ•°æ®(æäº¤æˆåŠŸè¿”å›çœŸå¦åˆ™è¿”å›å‡)
+bool CCgiManager::SubmitClicked(string String)
 {
-	if ( cgiFormSubmitClicked(String) == cgiFormSuccess )
+	if ( cgiFormSubmitClicked((char*)String.c_str()) == cgiFormSuccess )
 		return true;
 	else
 		return false;
 }
 
 
-// ÎªÕ¾µãÉèÖÃCookieÊı¾İ
-void CCgiManager::SetCookieString(char * Name, char * Value, char* Domain)
+// ä¸ºç«™ç‚¹è®¾ç½®Cookieæ•°æ®
+void CCgiManager::SetCookieString(string Name, string Value)
 {
-	if (strlen(Name)) 
+	if (Name.length()) 
 	{
 		/* Cookie lives for one day (or until browser chooses
 			to get rid of it, which may be immediately),
-			and applies only to this script on this site. */	
-		cgiHeaderCookieSetString(Name, Value, 86400, cgiScriptName, Domain);
+			and applies only to this script on this site. */
+
+		// ä¿å­˜
+		cgiHeaderCookieSetString((char*)Name.c_str(), (char*)UrlGB2312((char*)Value.c_str()).c_str(), cookie_expire, (char*)cookie_path.c_str(), (char*)cookie_domain.c_str());
 	}
 }
 
 
-void CCgiManager::SetCoolieInteger(char * Name, int Value, char* Domain)
+void CCgiManager::SetCoolieInteger(string Name, int Value)
 {
-	if (strlen(Name)) 
+	if (Name.length())
 	{
-		cgiHeaderCookieSetInteger(Name, Value, 86400, cgiScriptName, Domain);
+		cgiHeaderCookieSetInteger((char*)Name.c_str(), Value, cookie_expire, (char*)cookie_path.c_str(), (char*)cookie_domain.c_str());
 	}
 }
 
 
-// »ñÈ¡Õ¾µãCookieÊı¾İ
-char* CCgiManager::GetCookieString(char * Name)
+// è·å–ç«™ç‚¹Cookieæ•°æ®
+string CCgiManager::GetCookieString(string Name)
 {
-	char * value;
-	if (strlen(Name)) 
-	{
-		cgiCookieString(Name, value, sizeof(value));
-		return value;
-	}
-	else
-		return NULL;
-}
-
-
-int CCgiManager::GetCookieInteger(char * Name, int Default)
-{
-	int value;
-	if (strlen(Name)) 
-	{
-		cgiCookieInteger(Name, &value, Default);
-		return value;
-	}
-	else
-		return NULL;
-}
-
-
-//»ñÈ¡ËùÓĞCookieÊı¾İ
-char* CCgiManager::GetCookies(bool OutPut)
-{
-	char **arrays, **arrayStep;
+	/*char **arrays, **arrayStep;
 	if (cgiCookies(&arrays) != cgiFormSuccess) 
 	{
-		return NULL;
+		return "";
 	}
-	
-	// ¸³Öµ
+
 	arrayStep = arrays;
-	if(OutPut)
+	while (*arrayStep) 
 	{
-		while (*arrayStep) 
+		char value[65535];
+		cgiHtmlEscape(*arrayStep);
+		cgiCookieString(*arrayStep, value, sizeof(value));
+
+		string TargetName(*arrayStep);
+		if(TargetName == Name)
 		{
-			HtmlEscape(*arrayStep);
-		    arrayStep++;
+			cgiHtmlEscape(value);
+			string Value(value);
+			return Value;
 		}
+		arrayStep++;
 	}
 
-	// ÊÍ·Å¶ÔÏó
 	cgiStringArrayFree(arrays);
+	return "";*/
 
-	return *arrayStep;
+	char value[65535];
+	if (Name.length()) 
+	{
+		cgiCookieString((char*)Name.c_str(), value, sizeof(value));
+		return UrlGB2312Decode(value);
+	}
+	else
+		return NULL;
 }
 
 
-//»ñÈ¡ËùÓĞ±íµ¥Ãû³Æ(Name)
-char* CCgiManager::Entries(bool OutPut)
+int CCgiManager::GetCookieInteger(string Name, int Default)
+{
+	int value;
+	if (Name.length()) 
+	{
+		cgiCookieInteger((char*)Name.c_str(), &value, Default);
+		return value;
+	}
+	else
+		return NULL;
+}
+
+
+//è·å–æ‰€æœ‰è¡¨å•åç§°(Name)
+string CCgiManager::Entries(bool OutPut)
 {
 	char **arrays, **arrayStep;
 	if (cgiFormEntries(&arrays) != cgiFormSuccess) 
@@ -767,21 +1699,26 @@ char* CCgiManager::Entries(bool OutPut)
 	{
 		while (*arrayStep) 
 		{
-			HtmlEscape(*arrayStep);
+			string value(*arrayStep);
+			HtmlEscape(value);
 		    arrayStep++;
 		}
 	}
 
+	// èµ‹å€¼
+	string result(*arrayStep);
+
 	cgiStringArrayFree(arrays);
 	
-	return *arrayStep;
+	//return *arrayStep;
+	return result;
 }
 
 
-// ½«±íµ¥Êı¾İ´¢´æÔÚ´ÅÅÌÀï(ÊµÏÖ¶ÁÈ¡sessionÊı¾İ) 
-bool CCgiManager::LoadEnvironment(char * FileName)
+// å°†è¡¨å•æ•°æ®å‚¨å­˜åœ¨ç£ç›˜é‡Œ(å®ç°è¯»å–sessionæ•°æ®) 
+bool CCgiManager::LoadEnvironment(string FileName)
 {
-	if (cgiReadEnvironment(FileName) != cgiEnvironmentSuccess) 
+	if (cgiReadEnvironment((char*)FileName.c_str()) != cgiEnvironmentSuccess) 
 	{
 		return false;
 	}
@@ -790,10 +1727,10 @@ bool CCgiManager::LoadEnvironment(char * FileName)
 }
 
 
-// ´Ó´ÅÅÌÀï¶ÁÈ¡±íµ¥Êı¾İ£¨ÊµÏÖ·ÅÖÃsessionÊı¾İ£©
-bool CCgiManager::SaveEnvironment(char * FileName)
+// ä»ç£ç›˜é‡Œè¯»å–è¡¨å•æ•°æ®ï¼ˆå®ç°æ”¾ç½®sessionæ•°æ®ï¼‰
+bool CCgiManager::SaveEnvironment(string FileName)
 {
-	if (cgiWriteEnvironment(FileName) != cgiEnvironmentSuccess) 
+	if (cgiWriteEnvironment((char*)FileName.c_str()) != cgiEnvironmentSuccess) 
 	{
 		return false;
 	} 
@@ -804,233 +1741,279 @@ bool CCgiManager::SaveEnvironment(char * FileName)
 }
 
 
-// »ñÈ¡ÎÄ¼şÊı¾İ
-bool CCgiManager::InPutFile(char* String, char* &FileName, int &FileSize, char* &contentType)
+// è·å–æ–‡ä»¶æ•°æ®
+bool CCgiManager::InPutFile(string String, string &FileName, int &FileSize, string &contentType)
 {
-	// µÃµ½ÎÄ¼şÃû
-	if (cgiFormFileName(String, FileName, sizeof(FileName)) != cgiFormSuccess)
+	// å¾—åˆ°æ–‡ä»¶å
+	if (cgiFormFileName((char*)String.c_str(), (char*)FileName.c_str(), FileName.size()) != cgiFormSuccess)
 	{
-		// Ã»ÓĞ½ÓÊÜµ½ÎÄ¼şÊı¾İ
+		// æ²¡æœ‰æ¥å—åˆ°æ–‡ä»¶æ•°æ®
 		return false;
 	}
 
-	// µÃµ½ÎÄ¼ş´óĞ¡
-	cgiFormFileSize(String, &FileSize);
+	// å¾—åˆ°æ–‡ä»¶å¤§å°
+	cgiFormFileSize((char*)String.c_str(), &FileSize);
 
-	// µÃµ½ÎÄ¼şÀàĞÍ
-	cgiFormFileContentType(String, contentType, sizeof(contentType));
+	// å¾—åˆ°æ–‡ä»¶ç±»å‹
+	cgiFormFileContentType((char*)String.c_str(), (char*)contentType.c_str(), contentType.size());
 
-	// ·µ»Ø
+	// è¿”å›
 	return true;
 }
 
 
-// ¶ÁÈ¡ÎÄ¼şÊı¾İ
-char* CCgiManager::ReadFileData(char* String, bool OutPut)
+// è¯»å–æ–‡ä»¶æ•°æ®
+string CCgiManager::ReadFileData(string String, bool OutPut)
 {
 	cgiFilePtr File;
 	char buffer[1024];
 	int got;
 
-	// ´ò¿ªÄ¿±êÎÄ¼ş
-	if (cgiFormFileOpen(String, &File) != cgiFormSuccess)
+	// æ‰“å¼€ç›®æ ‡æ–‡ä»¶
+	if (cgiFormFileOpen((char*)String.c_str(), &File) != cgiFormSuccess)
 		return NULL;
 
-	char* result = "";
+	string result = "";
 	while (cgiFormFileRead(File, buffer, sizeof(buffer), &got) == cgiFormSuccess)
 	{
-		// ¸³Öµ
-		result = result + (char)buffer;
+		// èµ‹å€¼
+		result = result + buffer;
 		if(OutPut)
 			cgiHtmlEscapeData(buffer, got);
 	}
 
-	// ¹Ø±ÕÄ¿±êÎÄ¼ş
+	// å…³é—­ç›®æ ‡æ–‡ä»¶
 	cgiFormFileClose(File);
 
-	// ·µ»Ø
+	// è¿”å›
 	return result;
 }
 
 
-// ±£´æÎÄ¼şÊı¾İ
-bool CCgiManager::SaveFileData(char* String, char* FilePath)
+// ä¿å­˜æ–‡ä»¶æ•°æ®
+bool CCgiManager::SaveFileData(string String, string FilePath)
 {
 	char buffer[1024];
 	cgiFilePtr File;
 	int got;
 
 	FILE *fp;
-	fopen_s(&fp, FilePath, "a+");
+
+	#ifdef _WIN32
+	fopen_s(&fp, FilePath.c_str(), "a+");
+	#endif
+
+	#ifdef __linux
+	fp = fopen(FilePath.c_str(), "a+");
+	#endif
+
 	if(fp == NULL)
 	{
 		return false;
 	}
 	else
 	{
-		// Ğ´ÈëÊı¾İ
-		// ´ò¿ªÄ¿±êÎÄ¼ş
-		if (cgiFormFileOpen(String, &File) != cgiFormSuccess)
+		// å†™å…¥æ•°æ®
+		// æ‰“å¼€ç›®æ ‡æ–‡ä»¶
+		if (cgiFormFileOpen((char*)String.c_str(), &File) != cgiFormSuccess)
 			return false;
 
 		while (cgiFormFileRead(File, buffer, sizeof(buffer), &got) == cgiFormSuccess)
 		{
-			// Ğ´ÈëÊı¾İ
+			// å†™å…¥æ•°æ®
 			fputs(buffer, fp);
 		}
 
-		// ¹Ø±ÕÄ¿±êÎÄ¼ş
+		// å…³é—­ç›®æ ‡æ–‡ä»¶
 		cgiFormFileClose(File);
 	}
 
-	// ¹Ø±ÕÎÄ¼ş
+	// å…³é—­æ–‡ä»¶
 	fclose(fp);
 
-	// ·µ»Ø
+	// è¿”å›
 	return true;
 }
 
 
 
-// »ñÈ¡·şÎñÆ÷Èí¼şµÄÃû³Æ£¬Èç¹ûÎ´Öª£¬ÔòÖ¸Ïò¿Õ×Ö·û´®¡£
-char* CCgiManager::GetServerSoftware()
+// è·å–æœåŠ¡å™¨è½¯ä»¶çš„åç§°ï¼Œå¦‚æœæœªçŸ¥ï¼Œåˆ™æŒ‡å‘ç©ºå­—ç¬¦ä¸²ã€‚
+string CCgiManager::GetServerSoftware()
 {
-	return cgiServerSoftware;
+	string result(cgiServerSoftware);
+	return result;
 }
 
-// »ñÈ¡·şÎñÆ÷µÄÃû³Æ£¬Èç¹ûÎ´Öª£¬ÔòÖ¸Ïò¿Õ×Ö·û´®¡£
-char* CCgiManager::GetServerName()
+
+// è·å–æœåŠ¡å™¨çš„åç§°ï¼Œå¦‚æœæœªçŸ¥ï¼Œåˆ™æŒ‡å‘ç©ºå­—ç¬¦ä¸²ã€‚
+string CCgiManager::GetServerName()
 {
-	return cgiServerName;
+	string result(cgiServerName);
+	return result;
 }
 
-// »ñÈ¡Íø¹Ø½Ó¿Ú£¨Í¨³£ÎªCGI / 1.1£©µÄÃû³Æ£¬Èç¹ûÎ´Öª£¬ÔòÖ¸Ïò¿Õ×Ö·û´®¡£
-char* CCgiManager::GetGatewayInterface()
+
+// è·å–ç½‘å…³æ¥å£ï¼ˆé€šå¸¸ä¸ºCGI / 1.1ï¼‰çš„åç§°ï¼Œå¦‚æœæœªçŸ¥ï¼Œåˆ™æŒ‡å‘ç©ºå­—ç¬¦ä¸²ã€‚
+string CCgiManager::GetGatewayInterface()
 {
-	return cgiGatewayInterface;
+	string result(cgiGatewayInterface);
+	return result;
 }
 
-// »ñÈ¡Ê¹ÓÃµÄĞ­Òé£¨Í¨³£ÎªHTTP / 1.0£©£¬Èç¹ûÎ´Öª£¬ÔòÖ¸Ïò¿Õ×Ö·û´®¡£ 
-char* CCgiManager::GetServerProtocol()
+
+// è·å–ä½¿ç”¨çš„åè®®ï¼ˆé€šå¸¸ä¸ºHTTP / 1.0ï¼‰ï¼Œå¦‚æœæœªçŸ¥ï¼Œåˆ™æŒ‡å‘ç©ºå­—ç¬¦ä¸²ã€‚ 
+string CCgiManager::GetServerProtocol()
 {
-	return cgiServerProtocol;
+	string result(cgiServerProtocol);
+	return result;
 }
 
-// »ñÈ¡·şÎñÆ÷ÕıÔÚ¼àÌıHTTPÁ¬½Ó£¨Í¨³£Îª80£©µÄ¶Ë¿ÚºÅ£¬»òÎ´ÖªµÄ¿Õ×Ö·û´®¡£ 
-char* CCgiManager::GetServerPort()
+
+// è·å–æœåŠ¡å™¨æ­£åœ¨ç›‘å¬HTTPè¿æ¥ï¼ˆé€šå¸¸ä¸º80ï¼‰çš„ç«¯å£å·ï¼Œæˆ–æœªçŸ¥çš„ç©ºå­—ç¬¦ä¸²ã€‚ 
+string CCgiManager::GetServerPort()
 {
-	return cgiServerPort;
+	string result(cgiServerPort);
+	return result;
 }
 
-// »ñÈ¡ÇëÇóÖĞÊ¹ÓÃµÄ·½·¨£¨Í¨³£ÎªGET»òPOST£©£¬Èç¹ûÎ´Öª£¨Õâ²»Ó¦¸Ã·¢Éú£©£¬ÔòÎª¿Õ×Ö·û´®£©¡£ 
-char* CCgiManager::GetRequestMethod()
+
+// è·å–è¯·æ±‚ä¸­ä½¿ç”¨çš„æ–¹æ³•ï¼ˆé€šå¸¸ä¸ºGETæˆ–POSTï¼‰ï¼Œå¦‚æœæœªçŸ¥ï¼ˆè¿™ä¸åº”è¯¥å‘ç”Ÿï¼‰ï¼Œåˆ™ä¸ºç©ºå­—ç¬¦ä¸²ï¼‰ã€‚ 
+string CCgiManager::GetRequestMethod()
 {
-	return cgiRequestMethod;
+	string result(cgiRequestMethod);
+	return result;
 }
 
-// ´ó¶àÊıWeb·şÎñÆ÷ÔÚÇëÇóµÄURLÖĞÊ¶±ğ³ö³¬³öCGI³ÌĞò±¾ÉíµÄÈÎºÎ¸½¼ÓÂ·¾¶ĞÅÏ¢£¬²¢½«¸ÃĞÅÏ¢´«µİ¸ø³ÌĞò¡£cgiPathInfoÖ¸ÏòÕâ¸ö¶îÍâµÄÂ·¾¶ĞÅÏ¢¡£ 
-char* CCgiManager::GetPathInfo()
+
+// å¤§å¤šæ•°WebæœåŠ¡å™¨åœ¨è¯·æ±‚çš„URLä¸­è¯†åˆ«å‡ºè¶…å‡ºCGIç¨‹åºæœ¬èº«çš„ä»»ä½•é™„åŠ è·¯å¾„ä¿¡æ¯ï¼Œå¹¶å°†è¯¥ä¿¡æ¯ä¼ é€’ç»™ç¨‹åºã€‚cgiPathInfoæŒ‡å‘è¿™ä¸ªé¢å¤–çš„è·¯å¾„ä¿¡æ¯ã€‚ 
+string CCgiManager::GetPathInfo()
 {
-	return cgiPathInfo;
+	string result(cgiPathInfo);
+	return result;
 }
 
-// ´ó¶àÊıWeb·şÎñÆ÷ÔÚÇëÇóµÄURLÖĞÊ¶±ğ³ö³¬³öCGI³ÌĞò±¾ÉíµÄÈÎºÎ¸½¼ÓÂ·¾¶ĞÅÏ¢£¬²¢½«¸ÃĞÅÏ¢´«µİ¸ø³ÌĞò¡£cgiPathTranslatedÖ¸Ïò´Ë¸½¼ÓÂ·¾¶ĞÅÏ¢£¬ÓÉ·şÎñÆ÷×ª»»Îª±¾µØ·şÎñÆ÷ÉÏµÄÎÄ¼şÏµÍ³Â·¾¶¡£ 
-char* CCgiManager::GetPathTranslated()
+
+// å¤§å¤šæ•°WebæœåŠ¡å™¨åœ¨è¯·æ±‚çš„URLä¸­è¯†åˆ«å‡ºè¶…å‡ºCGIç¨‹åºæœ¬èº«çš„ä»»ä½•é™„åŠ è·¯å¾„ä¿¡æ¯ï¼Œå¹¶å°†è¯¥ä¿¡æ¯ä¼ é€’ç»™ç¨‹åºã€‚cgiPathTranslatedæŒ‡å‘æ­¤é™„åŠ è·¯å¾„ä¿¡æ¯ï¼Œç”±æœåŠ¡å™¨è½¬æ¢ä¸ºæœ¬åœ°æœåŠ¡å™¨ä¸Šçš„æ–‡ä»¶ç³»ç»Ÿè·¯å¾„ã€‚ 
+string CCgiManager::GetPathTranslated()
 {
-	return cgiPathTranslated;
+	string result(cgiPathTranslated);
+	return result;
 }
 
-// »ñÈ¡µ÷ÓÃ³ÌĞòµÄÃû³Æ¡£ 
-char* CCgiManager::GetScriptName()
+
+// è·å–è°ƒç”¨ç¨‹åºçš„åç§°ã€‚ 
+string CCgiManager::GetScriptName()
 {
-	return cgiScriptName;
+	string result(cgiScriptName);
+	return result;
 }
 
-// »ñÈ¡°üº¬ÓÉGET·½·¨±íµ¥»ò<ISINDEX>±êÇ©µ¼ÖÂÓÃ»§Ìá½»µÄÈÎºÎ²éÑ¯ĞÅÏ¢¡£Çë×¢Òâ£¬³ı·ÇÊ¹ÓÃ<ISINDEX>±ê¼Ç£¬·ñÔò²»ĞèÒªÖ±½Ó½âÎö´ËĞÅÏ¢; Í¨³£Ëü×Ô¶¯½âÎö¡£Ê¹ÓÃcgiFormº¯ÊıÏµÁĞ¼ìË÷Óë±íµ¥ÊäÈë×Ö¶ÎÏà¹ØµÄÖµ¡£
-char* CCgiManager::GetQueryString()
+
+// è·å–åŒ…å«ç”±GETæ–¹æ³•è¡¨å•æˆ–<ISINDEX>æ ‡ç­¾å¯¼è‡´ç”¨æˆ·æäº¤çš„ä»»ä½•æŸ¥è¯¢ä¿¡æ¯ã€‚è¯·æ³¨æ„ï¼Œé™¤éä½¿ç”¨<ISINDEX>æ ‡è®°ï¼Œå¦åˆ™ä¸éœ€è¦ç›´æ¥è§£ææ­¤ä¿¡æ¯; é€šå¸¸å®ƒè‡ªåŠ¨è§£æã€‚ä½¿ç”¨cgiFormå‡½æ•°ç³»åˆ—æ£€ç´¢ä¸è¡¨å•è¾“å…¥å­—æ®µç›¸å…³çš„å€¼ã€‚
+string CCgiManager::GetQueryString()
 {
-	return cgiQueryString;
+	string result(cgiQueryString);
+	return result;
 }
 
-// »ñÈ¡ä¯ÀÀÆ÷µÄÍêÈ«½âÎöµÄÖ÷»úÃû£¨Èç¹ûÒÑÖª£©»ò¿Õ×Ö·û´®£¨Èç¹ûÎ´Öª£©¡£ 
-char* CCgiManager::GetRemoteHost()
+
+// è·å–æµè§ˆå™¨çš„å®Œå…¨è§£æçš„ä¸»æœºåï¼ˆå¦‚æœå·²çŸ¥ï¼‰æˆ–ç©ºå­—ç¬¦ä¸²ï¼ˆå¦‚æœæœªçŸ¥ï¼‰ã€‚ 
+string CCgiManager::GetRemoteHost()
 {
-	return cgiRemoteHost;
+	string result(cgiRemoteHost);
+	return result;
 }
 
-// »ñÈ¡ä¯ÀÀÆ÷µÄµã·ÖÊ®½øÖÆIPµØÖ·£¨Èç¹ûÒÑÖª£©»ò¿Õ×Ö·û´®£¨Èç¹ûÎ´Öª£©¡£ 
-char* CCgiManager::GetRemoteAddr()
+
+// è·å–æµè§ˆå™¨çš„ç‚¹åˆ†åè¿›åˆ¶IPåœ°å€ï¼ˆå¦‚æœå·²çŸ¥ï¼‰æˆ–ç©ºå­—ç¬¦ä¸²ï¼ˆå¦‚æœæœªçŸ¥ï¼‰ã€‚ 
+string CCgiManager::GetRemoteAddr()
 {
-	return cgiRemoteAddr;
+	string result(cgiRemoteAddr);
+	return result;
 }
 
-// »ñÈ¡ÓÃÓÚÇëÇóµÄÊÚÈ¨ÀàĞÍ£¨Èç¹ûÓĞµÄ»°£©£¬Èç¹ûÃ»ÓĞ»òÎ´Öª£¬ÔòÖ¸Ïò¿Õ×Ö·û´®¡£ 
-char* CCgiManager::GetAuthType()
+
+// è·å–ç”¨äºè¯·æ±‚çš„æˆæƒç±»å‹ï¼ˆå¦‚æœæœ‰çš„è¯ï¼‰ï¼Œå¦‚æœæ²¡æœ‰æˆ–æœªçŸ¥ï¼Œåˆ™æŒ‡å‘ç©ºå­—ç¬¦ä¸²ã€‚ 
+string CCgiManager::GetAuthType()
 {
-	return cgiAuthType;
+	string result(cgiAuthType);
+	return result;
 }
 
-// »ñÈ¡ÓÃ»§ÒÑ¾­ÈÏÖ¤µÄÓÃ»§Ãû; Èç¹ûÃ»ÓĞ·¢ÉúÉí·İÑéÖ¤£¬ÔòÎª¿Õ×Ö·û´®¡£ÕâĞ©ĞÅÏ¢µÄÈ·¶¨ĞÔÈ¡¾öÓÚÊ¹ÓÃÊÚÈ¨µÄÀàĞÍ; 
-char* CCgiManager::GetRemoteUser()
+
+// è·å–ç”¨æˆ·å·²ç»è®¤è¯çš„ç”¨æˆ·å; å¦‚æœæ²¡æœ‰å‘ç”Ÿèº«ä»½éªŒè¯ï¼Œåˆ™ä¸ºç©ºå­—ç¬¦ä¸²ã€‚è¿™äº›ä¿¡æ¯çš„ç¡®å®šæ€§å–å†³äºä½¿ç”¨æˆæƒçš„ç±»å‹; 
+string CCgiManager::GetRemoteUser()
 {
-	return cgiRemoteUser;
+	string result(cgiRemoteUser);
+	return result;
 }
 
-// ÓÉÓÃ»§Í¨¹ıÓÃ»§Ê¶±ğĞ­Òé×ÔÔ¸Ö¸¶¨ÓÃ»§Ãû; Ò»¸ö¿Õ×Ö·û´®£¬Èç¹ûÎ´Öª¡£´ËĞÅÏ¢²»°²È«¡£¿ÉÒÔÓÉÓÃ»§°²×°ÔÚ²»°²È«µÄÏµÍ³£¬ÈçWindows»úÆ÷ÉÏ¡£ 
-char* CCgiManager::GetRemoteIdent()
+
+// ç”±ç”¨æˆ·é€šè¿‡ç”¨æˆ·è¯†åˆ«åè®®è‡ªæ„¿æŒ‡å®šç”¨æˆ·å; ä¸€ä¸ªç©ºå­—ç¬¦ä¸²ï¼Œå¦‚æœæœªçŸ¥ã€‚æ­¤ä¿¡æ¯ä¸å®‰å…¨ã€‚å¯ä»¥ç”±ç”¨æˆ·å®‰è£…åœ¨ä¸å®‰å…¨çš„ç³»ç»Ÿï¼Œå¦‚Windowsæœºå™¨ä¸Šã€‚ 
+string CCgiManager::GetRemoteIdent()
 {
-	return cgiRemoteIdent;
+	string result(cgiRemoteIdent);
+	return result;
 }
 
-// »ñÈ¡ÓÃ»§Ìá½»µÄĞÅÏ¢µÄMIMEÄÚÈİÀàĞÍ£¨Èç¹ûÓĞ£©; Èç¹ûÃ»ÓĞÌá½»ĞÅÏ¢£¬ÔòÎª¿Õ×Ö·û´®¡£Èç¹û´Ë×Ö·û´®µÈÓÚ application/x-www-form-urlencoded»ò multipart/form-data£¬Ôò×Ô¶¯¼ì²éÌá½»µÄ±íµ¥Êı¾İ¡£Èç¹û´Ë×Ö·û´®¾ßÓĞÈÎºÎÆäËû·Ç¿ÕÖµ£¬Ôò»áÌá½»²»Í¬ÀàĞÍµÄÊı¾İ¡£ÕâÊÇ·Ç³£º±¼ûµÄ£¬ÒòÎª´ó¶àÊıä¯ÀÀÆ÷Ö»ÄÜÖ±½ÓÌá½»±íµ¥ºÍÎÄ¼şÉÏ´«¡£ 
-char* CCgiManager::GetContentType()
+
+// è·å–ç”¨æˆ·æäº¤çš„ä¿¡æ¯çš„MIMEå†…å®¹ç±»å‹ï¼ˆå¦‚æœæœ‰ï¼‰; å¦‚æœæ²¡æœ‰æäº¤ä¿¡æ¯ï¼Œåˆ™ä¸ºç©ºå­—ç¬¦ä¸²ã€‚å¦‚æœæ­¤å­—ç¬¦ä¸²ç­‰äº application/x-www-form-urlencodedæˆ– multipart/form-dataï¼Œåˆ™è‡ªåŠ¨æ£€æŸ¥æäº¤çš„è¡¨å•æ•°æ®ã€‚å¦‚æœæ­¤å­—ç¬¦ä¸²å…·æœ‰ä»»ä½•å…¶ä»–éç©ºå€¼ï¼Œåˆ™ä¼šæäº¤ä¸åŒç±»å‹çš„æ•°æ®ã€‚è¿™æ˜¯éå¸¸ç½•è§çš„ï¼Œå› ä¸ºå¤§å¤šæ•°æµè§ˆå™¨åªèƒ½ç›´æ¥æäº¤è¡¨å•å’Œæ–‡ä»¶ä¸Šä¼ ã€‚ 
+string CCgiManager::GetContentType()
 {
-	return cgiContentType;
+	string result(cgiContentType);
+	return result;
 }
 
-// »ñÈ¡Webä¯ÀÀÆ÷Ìá½»µÄÔ­Ê¼Cookie£¨ä¯ÀÀÆ÷¶ËÓÀ¾Ã´æ´¢£©Êı¾İ¡£Ó¦¸ÃÊ¹ÓÃº¯ÊıGetCookies£¬ GetCookieStringºÍ GetCookieInteger£¬¶ø²»ÊÇÖ±½Ó¼ì²éÕâ¸ö×Ö·û´®¡£ 
-char* CCgiManager::GetCookie()
+
+// è·å–Webæµè§ˆå™¨æäº¤çš„åŸå§‹Cookieï¼ˆæµè§ˆå™¨ç«¯æ°¸ä¹…å­˜å‚¨ï¼‰æ•°æ®ã€‚åº”è¯¥ä½¿ç”¨å‡½æ•°GetCookiesï¼Œ GetCookieStringå’Œ GetCookieIntegerï¼Œè€Œä¸æ˜¯ç›´æ¥æ£€æŸ¥è¿™ä¸ªå­—ç¬¦ä¸²ã€‚ 
+string CCgiManager::GetCookie()
 {
-	return cgiCookie;
+	string result(cgiCookie);
+	return result;
 }
 
-// »ñÈ¡ä¯ÀÀÆ÷¿ÉÒÔ½ÓÊÜµÄMIMEÄÚÈİÀàĞÍµÄ¿Õ¸ñ·Ö¸ôÁĞ±í£¨Çë²ÎÔÄ cgiHeaderContentType£¨£©£©»ò¿Õ×Ö·û´®¡£²»ĞÒµÄÊÇ£¬´ó¶àÊıµ±Ç°µÄä¯ÀÀÆ÷²¢²»ÊÇÒÔÒ»ÖÖÓĞÓÃµÄĞÎÊ½Ìá¹©Õâ¸ö±äÁ¿¡£
-char* CCgiManager::GetAccept()
+
+// è·å–æµè§ˆå™¨å¯ä»¥æ¥å—çš„MIMEå†…å®¹ç±»å‹çš„ç©ºæ ¼åˆ†éš”åˆ—è¡¨ï¼ˆè¯·å‚é˜… cgiHeaderContentTypeï¼ˆï¼‰ï¼‰æˆ–ç©ºå­—ç¬¦ä¸²ã€‚ä¸å¹¸çš„æ˜¯ï¼Œå¤§å¤šæ•°å½“å‰çš„æµè§ˆå™¨å¹¶ä¸æ˜¯ä»¥ä¸€ç§æœ‰ç”¨çš„å½¢å¼æä¾›è¿™ä¸ªå˜é‡ã€‚
+string CCgiManager::GetAccept()
 {
-	return cgiAccept;
+	string result(cgiAccept);
+	return result;
 }
 
-// »ñÈ¡ÕıÔÚÊ¹ÓÃµÄä¯ÀÀÆ÷µÄÃû³Æ£¬Èç¹û´ËĞÅÏ¢²»¿ÉÓÃ£¬ÔòÎª¿Õ×Ö·û´®¡£ 
-char* CCgiManager::GetUserAgent()
+
+// è·å–æ­£åœ¨ä½¿ç”¨çš„æµè§ˆå™¨çš„åç§°ï¼Œå¦‚æœæ­¤ä¿¡æ¯ä¸å¯ç”¨ï¼Œåˆ™ä¸ºç©ºå­—ç¬¦ä¸²ã€‚ 
+string CCgiManager::GetUserAgent()
 {
-	return cgiUserAgent;
+	string result(cgiUserAgent);
+	return result;
 }
 
-// »ñÈ¡ÓÃ»§·ÃÎÊµÄÉÏÒ»Ò³µÄURL¡£ÕâÍ¨³£ÊÇ½«ÓÃ»§´øµ½ÄúµÄ³ÌĞòµÄ±íµ¥µÄURL¡£Çë×¢Òâ£¬±¨¸æ´ËĞÅÏ¢ÍêÈ«È¡¾öÓÚä¯ÀÀÆ÷£¬¿ÉÄÜÑ¡Ôñ²»ÕâÑù×ö¡£µ«ÊÇ£¬¸Ã±äÁ¿Í¨³£ÊÇ×¼È·µÄ¡£
-char* CCgiManager::GetReferrer()
+
+// è·å–ç”¨æˆ·è®¿é—®çš„ä¸Šä¸€é¡µçš„URLã€‚è¿™é€šå¸¸æ˜¯å°†ç”¨æˆ·å¸¦åˆ°æ‚¨çš„ç¨‹åºçš„è¡¨å•çš„URLã€‚è¯·æ³¨æ„ï¼ŒæŠ¥å‘Šæ­¤ä¿¡æ¯å®Œå…¨å–å†³äºæµè§ˆå™¨ï¼Œå¯èƒ½é€‰æ‹©ä¸è¿™æ ·åšã€‚ä½†æ˜¯ï¼Œè¯¥å˜é‡é€šå¸¸æ˜¯å‡†ç¡®çš„ã€‚
+string CCgiManager::GetReferrer()
 {
-	return cgiReferrer;
+	string result(cgiReferrer);
+	return result;
 }
 
-// »ñÈ¡ÊÕµ½µÄ±íµ¥»ò²éÑ¯Êı¾İµÄ×Ö½ÚÊı¡£Çë×¢Òâ£¬Èç¹ûÌá½»ÊÇÌá½»±íµ¥»ò²éÑ¯£¬¿â½«Ö±½Ó´ÓcgiInºÍ/»òcgiQueryString¶ÁÈ¡ºÍ½âÎöËùÓĞĞÅÏ¢¡£ÔÚÕâÖÖÇé¿öÏÂ£¬³ÌĞòÔ±²»Ó¦¸ÃÕâÑù×ö¡£
+
+// è·å–æ”¶åˆ°çš„è¡¨å•æˆ–æŸ¥è¯¢æ•°æ®çš„å­—èŠ‚æ•°ã€‚è¯·æ³¨æ„ï¼Œå¦‚æœæäº¤æ˜¯æäº¤è¡¨å•æˆ–æŸ¥è¯¢ï¼Œåº“å°†ç›´æ¥ä»cgiInå’Œ/æˆ–cgiQueryStringè¯»å–å’Œè§£ææ‰€æœ‰ä¿¡æ¯ã€‚åœ¨è¿™ç§æƒ…å†µä¸‹ï¼Œç¨‹åºå‘˜ä¸åº”è¯¥è¿™æ ·åšã€‚
 int CCgiManager::GetContentLength()
 {
 	return cgiContentLength;
 }
 
+
 /************************************************************************************************************************************************************************************************/
 
 
-/* ¿ØÖÆÆ÷Àà***********************************************************************************************************************************************************************************
- *  ÓÃÍ¾£º¿ØÖÆÄ£ĞÍÓëÊÓÍ¼µÄ½»»¥
+/* æ§åˆ¶å™¨ç±»***********************************************************************************************************************************************************************************
+ *  ç”¨é€”ï¼šæ§åˆ¶æ¨¡å‹ä¸è§†å›¾çš„äº¤äº’
  */
 CController::CController()
 {
 }
 
-CController::CController(char * Type): CCgiManager(Type)
-{
-}
 
 CController::~CController()
 {
@@ -1038,78 +2021,230 @@ CController::~CController()
 }
 
 
-// µÃµ½ HTML ÄÚÈİ
-char* CController::HtmlRead(char* FileName)
+// æ§åˆ¶å™¨åˆå§‹åŒ–
+void CController::Initialize()
 {
-	// ¶ÁÈ¡ÎÄ¼ş
-	FILE *fp;
-	fopen_s(&fp, FileName, "r");
+	bool ControllerExist = false;
+	bool FunctionExist   = false;
 
-	// ¶¨Òå±äÁ¿
+	// åˆ¤æ–­è§£æç»“æœ
+	if(Controller.empty() || Controller == "" || Function.empty() || Function == "")
+		return;
+
+	// æŸ¥æ‰¾ç›®æ ‡æ§åˆ¶å™¨
+	for(map<string, map<string, PtrFun> >::iterator i = FunTab.begin(); i != FunTab.end(); i++)
+	{
+		string Name = i->first;
+		if(Name == Controller)
+			ControllerExist = true;
+
+		for(map<string, PtrFun>::iterator j = (i->second).begin(); j != (i->second).end(); j++)
+		{
+			string Name = j->first;
+			if(Name == Function)
+				FunctionExist = true;
+        }
+    }
+
+	// æ§åˆ¶å™¨ä¸å­˜åœ¨
+	if(!ControllerExist)
+	{
+		char message[1024] = {0};
+		sprintf(message, "æ§åˆ¶å™¨:%s ä¸å­˜åœ¨!", Controller.c_str());
+		
+		// è®°å½•æ—¥å¿—
+		Record(message);
+
+		// è¾“å‡ºé”™è¯¯
+		DisplayError(message);
+	}
+	else if(!FunctionExist)
+	{
+		char message[1024] = {0};
+		sprintf(message, "æ–¹æ³•:%s ä¸å­˜åœ¨!", Function.c_str());
+
+		// è®°å½•æ—¥å¿—
+		Record(message);
+
+		// è¾“å‡ºé”™è¯¯
+		DisplayError(message);
+	}
+	else
+	{
+		// æ‰§è¡Œæ–¹æ³•
+		FunTab[Controller][Function]();
+	}
+}
+
+
+// å¾—åˆ° HTML å†…å®¹
+string CController::HtmlRead(string FileName)
+{
+	// è¯»å–æ–‡ä»¶
+	FILE *fp;
+
+	#ifdef _WIN32
+	fopen_s(&fp, FileName.c_str(), "r");
+	#endif
+
+	#ifdef __linux
+	fp = fopen(FileName.c_str(), "r");
+	#endif
+
+	// å®šä¹‰å˜é‡
 	char str[1024], buff[65535];
 	if ( fp == NULL )
 	{
-		printf("open file error\n" );
+		char message[1024] = {0};
+		sprintf(message, "ç½‘é¡µæ–‡ä»¶:%s ä¸å­˜åœ¨!", FileName.c_str());
+
+		// è®°å½•æ—¥å¿—
+		CController::Record(message);
+
+		// è¾“å‡ºé”™è¯¯
+		CController::DisplayError(message);
 		return "";
 	}
 
-	// Ñ­»·¶ÁÈ¡HTML
+	// å¾ªç¯è¯»å–HTML
 	while( fgets(str, sizeof(str), fp ) )
 	{
-		// ´¢´æÔÚbuffÖĞ
+		// å‚¨å­˜åœ¨buffä¸­
 		strcat(buff, str);
 	}
 
-	// ¹Ø±ÕÎÄ¼ş
+	// å…³é—­æ–‡ä»¶
 	fclose(fp);
 
-	// ·µ»ØÊı¾İ
-	char * result = buff;
+	// è¿”å›æ•°æ®
+	string result(buff);
 	return result;
 }
 
 
-// äÖÈ¾²¢Êä³öHTML
-void CController::HtmlView(char* FileName, ...)
+// æ¸²æŸ“å¹¶è¾“å‡ºHTML
+void CController::HtmlView(string FileName, ...)
 {
-	//µÃµ½±ä²ÎµÄÆğÊ¼µØÖ·
+	//å¾—åˆ°å˜å‚çš„èµ·å§‹åœ°å€
 	va_list  pArgList;
 	va_start(pArgList, FileName);
 
-	// µÃµ½ HTML ÄÚÈİ
-	char s[65535], *source = HtmlRead(FileName);
-	
-	// ¸ñÊ½»¯²¢Êä³ö
-	vsnprintf(s, 65535, source, pArgList);
-	OutPut(s);
+	// è¿æ¥å­—ç¬¦ä¸², å¾—åˆ°ç›®æ ‡
+	string Target = "application/view/" + Controller + "/"+ FileName + "." + html_suffix;
 
-	//ÊÕÎ²
+	// å¾—åˆ° HTML å†…å®¹
+	char s[65535];
+	
+	// æ ¼å¼åŒ–å¹¶è¾“å‡º
+	vsnprintf(s, 65535, HtmlRead(Target).c_str(), pArgList);
+
+	// æ›¿æ¢ç»‘å®šæ•°æ®
+	if(!IntegerMap.empty())
+	{
+		map<string, int>::iterator iter;
+		for(iter = IntegerMap.begin(); iter != IntegerMap.end(); iter++)
+		{
+			char* name = (char*)iter->first.c_str(), value[65535] = "";
+			sprintf(value, "%d", iter->second);
+			Replace(s, name, value);
+		}
+		IntegerMap.clear();
+	}
+
+	if(!StringMap.empty())
+	{
+		map<string, string>::iterator iter;
+		for(iter = StringMap.begin(); iter != StringMap.end(); iter++)
+		{
+			char* name  = (char*)iter->first.c_str();
+			char* value = (char*)iter->second.c_str();
+			Replace(s, name, value);
+		}
+		StringMap.clear();
+	}
+
+	if(!DoubleMap.empty())
+	{
+		map<string, double>::iterator iter;
+		for(iter = DoubleMap.begin(); iter != DoubleMap.end(); iter++)
+		{
+			char* name = (char*)iter->first.c_str(), value[65535] = "";
+			sprintf(value, "%.2lf", iter->second);
+			Replace(s, name, value);
+		}
+		DoubleMap.clear();
+	}
+
+	if(!ListMap.empty())
+	{
+		map<string, vector<string> >::iterator iter;
+		for(iter = ListMap.begin(); iter != ListMap.end(); iter++)
+		{
+			//
+		}
+		ListMap.clear();
+	}
+
+	// é»˜è®¤æ›¿æ¢cssä¸jsèµ„æº
+	Replace(s, "__PUBLIC__", "/public");
+	Replace(s, "__CSS__",    "/public/css");
+	Replace(s, "__JS__",     "/public/js");
+	Replace(s, "__IMG__",    "/public/img");
+
+	// æ¸²æŸ“è¾“å‡ºHTML
+	OutPut(s, pArgList);
+
+	//æ”¶å°¾
 	va_end(pArgList);
 }
 
 
-// Json±àÂë,·µ»ØjsonÊı¾İ
-char* CController::Json_Encode()
+// ç»‘å®šè§†å›¾æ•°æ®
+void CController::BindValue(string Name, int Value)
 {
-
+	IntegerMap[Name] = Value;
 }
 
 
-// Json ½âÂë
+void CController::BindValue(string Name, string Value)
+{
+	StringMap[Name] = Value;
+}
+
+
+void CController::BindValue(string Name, double Value)
+{
+	DoubleMap[Name] = Value;
+}
+
+
+void CController::BindValue(string Name, vector<string> Value)
+{
+	ListMap[Name] = Value;
+}
+
+
+// Jsonç¼–ç ,è¿”å›jsonæ•°æ®
+string CController::Json_Encode()
+{
+	return "";
+}
+
+
+// Json è§£ç 
 void CController::Json_Decode()
 {
-
 }
 
 
-// Xml±àÂë,·µ»ØxmlÊı¾İ
-char* CController::Xml_Encode()
+// Xmlç¼–ç ,è¿”å›xmlæ•°æ®
+string CController::Xml_Encode()
 {
-
+	return "";
 }
 
 
-// Xml ½âÂë
+// Xml è§£ç 
 void CController::Xml_Decode()
 {
 }
@@ -1118,12 +2253,15 @@ void CController::Xml_Decode()
 /***************************************************************************************************************************************************************************************************/
 
 
-/* Ä£ĞÍÀà***********************************************************************************************************************************************************************************
- *  ÓÃÍ¾£º½øĞĞ¸÷ÖÖÊı¾İ½»»¥
+/* æ¨¡å‹ç±»***********************************************************************************************************************************************************************************
+ *  ç”¨é€”ï¼šè¿›è¡Œå„ç§æ•°æ®äº¤äº’
  */
-CModel::CModel(): CSqliteManager(true)
+CModel::CModel()
 {
-	// ×Ô¶¯ÅäÖÃÊı¾İ¿â
+	// åˆå§‹åŒ–
+	Initialize = false;
+
+	// æ•°æ®åº“åˆå§‹åŒ–
 	DatabaseConfig();
 }
 
@@ -1134,13 +2272,56 @@ CModel::~CModel()
 }
 
 
-// ÅäÖÃÊı¾İ¿â
-void CModel::DatabaseConfig(char* ConfigFile)
+//å¿«é€Ÿæ’åºï¼Œåœ¨å­å‡½æ•°ä¸­ï¼Œæ•°ç»„å·²è¢«æ”¹å˜
+void quick_sort(int *a, int left, int right) //leftå’Œrightä¸ºç´¢å¼•å€¼
 {
-	// ¶ÁÈ¡ÅäÖÃÎÄ¼ş
+	int temp; //å­˜å‚¨æ¯æ¬¡é€‰å®šçš„åŸºå‡†æ•°ï¼ˆä»æœ€å·¦ä¾§é€‰åŸºå‡†æ•°ï¼‰
+	int t;
+	int initial=left;
+	int end=right;
+	temp=a[left];
+ 
+	//***å¿…é¡»æœ‰è¿™ä¸€éƒ¨åˆ†***//
+	if (left>right)  //å› ä¸ºåœ¨é€’å½’è¿‡ç¨‹ä¸­æœ‰å‡1åŠ 1çš„æƒ…å†µï¼Œå½“å…¶è¶Šç•Œæ—¶ï¼Œç›´æ¥return,ä¸è¿”å›ä»»ä½•å€¼ï¼Œå³ç»“æŸå½“å‰ç¨‹åºå—
+		return;   
+ 
+	while(left!=right)  //æ­¤æ—¶å·¦å³indexåœ¨ç§»åŠ¨ä¸­ï¼Œè‹¥left==right,åˆ™è·³å‡ºå¾ªç¯ï¼Œå°†åŸºæ•°å½’ä½
+	{
+		while(a[right]>=temp && left<right)  //ç›´åˆ°æ‰¾åˆ°å°äºåŸºå‡†æ•°çš„å€¼ä¸ºå‡†
+			right--;
+		while(a[left]<=temp && left<right)
+			left++;
+		if(left<right)  //äº¤æ¢å·¦å³ä¸¤ä¾§å€¼ï¼Œå½“left=rightæ—¶ï¼Œè·³å‡ºå¤–å±‚whileå¾ªç¯
+		{
+			t=a[right];
+			a[right]=a[left];
+			a[left]=t;
+		}	
+	}
+	a[initial]=a[left];
+	a[left]=temp;        //åŸºæ•°å½’ä½
+ 
+	//é€’å½’å¤„ç†å½’ä½åçš„åŸºå‡†æ•°çš„å·¦å³ä¸¤ä¾§
+	quick_sort(a,initial,left-1);  //æ­¤æ—¶left=right
+	quick_sort(a,left+1,end);
+}
+
+
+// é…ç½®æ•°æ®åº“
+void CModel::DatabaseConfig(string ConfigFile)
+{
+	// æ£€æŸ¥é…ç½®æ–‡ä»¶
+	if(!CConfig::FileExist(ConfigFile))
+	{
+		CController::Record("æ•°æ®åº“é…ç½®æ–‡ä»¶ database.txt ä¸å­˜åœ¨!");
+		CController::DisplayError("æ•°æ®åº“é…ç½®æ–‡ä»¶ database.txt ä¸å­˜åœ¨!");
+		return;
+	}
+
+	// è¯»å–é…ç½®æ–‡ä»¶
     CConfig configSettings(ConfigFile);
 
-	// ½âÎöÅäÖÃÊı¾İ
+	// è§£æé…ç½®æ•°æ®
 	int    hostport = configSettings.Read("hostport", 0);
 	string type     = configSettings.Read("type",     type);
     string hostname = configSettings.Read("hostname", hostname);
@@ -1149,94 +2330,195 @@ void CModel::DatabaseConfig(char* ConfigFile)
     string password = configSettings.Read("password", password);
 	string charset  = configSettings.Read("charset",  charset);
 
-	// ¸ù¾İÊı¾İ¿âÀàĞÍ½øĞĞÅäÖÃ(²»Çø·Ö´óĞ¡Ğ´)
+	// æ ¹æ®æ•°æ®åº“ç±»å‹è¿›è¡Œé…ç½®(ä¸åŒºåˆ†å¤§å°å†™)
+	#ifdef _WIN32
 	if(_stricmp((char*)type.c_str(), "sqlite") == 0)
+	#endif
+
+	#ifdef __linux
+	if(strcasecmp((char*)type.c_str(), "sqlite") == 0)
+	#endif
 	{
-		// ¸³Öµ
+		// èµ‹å€¼
 		Type = 1;
 
-		// µÃµ½Êı¾İ¿âÂ·¾¶
-		CString Path(hostname.c_str()), DataBase_Name, DataBase_Path;
-
-		// ÅĞ¶ÏÂ·¾¶ÀàĞÍ(¾ø¶ÔÈ«Â·¾¶)
-		if(Path.Replace(_T("\\"), _T("\\")))
+		// å°è¯•è¿æ¥æ•°æ®åº“
+		if(!CModel::m_sqlite.LocalConnect(hostname, password))
 		{
-			DataBase_Name = Path.Right(Path.GetLength() - Path.ReverseFind('\\') -1);
-			DataBase_Path = Path.Left(Path.GetLength()  - DataBase_Name.GetLength());
-		}
+			//å˜é‡
+			string data_name, data_path, temp(hostname);
 
-		// ÅĞ¶ÏÂ·¾¶ÀàĞÍ(Ïà¶ÔÈ«Â·¾¶)
-		if(Path.ReverseFind('/'))
-		{
-			DataBase_Name = Path.Right(Path.GetLength() - Path.ReverseFind('/') -1);
-			DataBase_Path = Path.Left(Path.GetLength()  - DataBase_Name.GetLength());
-		}
+			//#ifdef _WIN32
+			////åˆ¤æ–­è·¯å¾„ç±»å‹(ç»å¯¹å…¨è·¯å¾„)
+			//if(hostname.find("\\") != -1)
+			//{
+			//	CCgiManager::Right(m_name, host, strlen(host) - hostname.rfind('\\') -1);
+			//	data_name = m_name;
 
-		// Èç¹û´æÔÚÄ¿±êÊı¾İ¿â
-		if (m_Sql.CheckDataBase( DataBase_Name, DataBase_Path, true ))
-		{
-			// Á¬½ÓÊı¾İ¿â
-			if(!m_Sql.OpenDataBase( DataBase_Name, DataBase_Path, true ))
+			//	CCgiManager::Left (m_path, host, strlen(host) - strlen(m_name));
+			//	data_path = m_path;
+			//}
+			//
+			////åˆ¤æ–­è·¯å¾„ç±»å‹(ç›¸å¯¹å…¨è·¯å¾„)
+			//else if(hostname.rfind('/') != -1)
+			//{
+			//	CCgiManager::Right(m_name, host, strlen(host) - hostname.rfind('/') -1);
+			//	data_name = m_name;
+
+			//	CCgiManager::Left (m_path, host, strlen(host) - strlen(m_name));
+			//	data_path = m_path;
+			//}
+   //         #else
+			////åˆ¤æ–­è·¯å¾„ç±»å‹(ç›¸å¯¹å…¨è·¯å¾„)
+			//if(hostname.rfind('/') != -1)
+			//{
+			//	CCgiManager::Right(m_name, host, strlen(host) - hostname.rfind('/') -1);
+			//	data_name = m_name;
+
+			//    CController::OutPut("%s %s", data_name.c_str(), data_path.c_str());
+			//    return;
+
+			//	CCgiManager::Left (m_path, host, strlen(host) - strlen(m_name));
+			//	data_path = m_path;
+			//}
+   //         #endif
+
+
+			//åˆ¤æ–­è·¯å¾„ç±»å‹(ç»å¯¹å…¨è·¯å¾„)
+			if(hostname.find("\\") != -1)
+			{
+				data_name = hostname.substr(hostname.find_last_of("\\") +1);
+
+				CCgiManager::Replace((char*)temp.c_str(), (char*)data_name.c_str(), "");
+				CCgiManager::Replace((char*)temp.c_str(), "\\", "");
+
+				data_path = temp;
+			}
+
+			//åˆ¤æ–­è·¯å¾„ç±»å‹(ç›¸å¯¹å…¨è·¯å¾„)
+			else if(hostname.rfind('/') != -1)
+			{
+				data_name = hostname.substr(hostname.find_last_of("/") +1);
+
+				CCgiManager::Replace((char*)temp.c_str(), (char*)data_name.c_str(), "");
+				CCgiManager::Replace((char*)temp.c_str(), "/", "");
+
+				data_path = temp;
+			}
+
+			// windows
+		    #ifdef _WIN32
+			// æ£€æŸ¥è·¯å¾„
+			if (!data_path.empty() && data_path != "" && 0 != _access(data_path.c_str(), 0))
+			{
+				// ç›®å½•ä¸å­˜åœ¨ï¼Œåˆ›å»ºç›®å½•
+				_mkdir(data_path.c_str());
+			}
+            #else
+			if (!data_path.empty() && data_path != "" && 0 != access(data_path.c_str(), 0))
+			{
+				// ç›®å½•ä¸å­˜åœ¨ï¼Œåˆ›å»ºç›®å½•
+				mkdir(data_path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+			}
+		    #endif;
+
+			// å°è¯•åˆ›å»ºæ•°æ®åº“
+			if(!m_sqlite.OpenDataBase(hostname))
+			{
+				// è¿æ¥å¤±è´¥,è¿”å›é”™è¯¯
+				CController::Record("æ•°æ®åº“è¿æ¥å¤±è´¥!");
+				CController::DisplayError("æ•°æ®åº“è¿æ¥å¤±è´¥!");
 				return;
+			}
+			else
+				Initialize = true;
 		}
 		else
-		{
-			// ´´½¨Êı¾İ¿â
-			if(!m_Sql.CreateDataBase( DataBase_Name, DataBase_Path, true ))
-				return;
+			Initialize = true;
 
-			// Á¬½ÓÊı¾İ¿â
-			if(!m_Sql.OpenDataBase(  DataBase_Name, DataBase_Path, true ))
-				return;
-		}
+		// å¾—åˆ°æ•°æ®åº“è·¯å¾„
+		//CString Path(hostname.c_str()), DataBase_Name, DataBase_Path;
+
+		//// åˆ¤æ–­è·¯å¾„ç±»å‹(ç»å¯¹å…¨è·¯å¾„)
+		//if(Path.Replace(_T("\\"), _T("\\")))
+		//{
+		//	DataBase_Name = Path.Right(Path.GetLength() - Path.ReverseFind('\\') -1);
+		//	DataBase_Path = Path.Left(Path.GetLength()  - DataBase_Name.GetLength());
+		//}
+
+		//// åˆ¤æ–­è·¯å¾„ç±»å‹(ç›¸å¯¹å…¨è·¯å¾„)
+		//if(Path.ReverseFind('/'))
+		//{
+		//	DataBase_Name = Path.Right(Path.GetLength() - Path.ReverseFind('/') -1);
+		//	DataBase_Path = Path.Left(Path.GetLength()  - DataBase_Name.GetLength());
+		//}
+
+		//// å¦‚æœå­˜åœ¨ç›®æ ‡æ•°æ®åº“
+		//if (m_sqlite.CheckDataBase( DataBase_Name, DataBase_Path))
+		//{
+		//	// è¿æ¥æ•°æ®åº“
+		//	if(!m_sqlite.OpenDataBase( DataBase_Name, DataBase_Path))
+		//		return;
+		//}
+		//else
+		//{
+		//	// åˆ›å»ºæ•°æ®åº“
+		//	if(!m_sqlite.CreateDataBase( DataBase_Name, DataBase_Path))
+		//		return;
+
+		//	// è¿æ¥æ•°æ®åº“
+		//	if(!m_sqlite.OpenDataBase(  DataBase_Name, DataBase_Path))
+		//		return;
+		//}
 	}
+
+	#ifdef _WIN32
 	else if(_stricmp((char*)type.c_str(), "mysql") == 0)
+	#endif
+
+	#ifdef __linux
+	else if(strcasecmp((char*)type.c_str(), "mysql") == 0)
+	#endif
 	{
-		// ¸³Öµ
+		// èµ‹å€¼
 		Type = 2;
 
-		// ÅäÖÃMySQLÊı¾İ¿â
+		// é…ç½®MySQLæ•°æ®åº“
 		std::cout<<"mysql:"<<std::endl;
 	}
+
+	#ifdef _WIN32
 	else if(_stricmp((char*)type.c_str(), "sqlserver") == 0)
+	#endif
+
+	#ifdef __linux
+	else if(strcasecmp((char*)type.c_str(), "sqlserver") == 0)
+	#endif
 	{
-		// ¸³Öµ
+		// èµ‹å€¼
 		Type = 3;
 
-		// ÅäÖÃSqlServerÊı¾İ¿â
+		// é…ç½®SqlServeræ•°æ®åº“
 		std::cout<<"SqlServer:"<<std::endl;
 	}
-
-
-	// ²âÊÔÊä³ö
-    /*std::cout<<"port:"<<hostport<<std::endl;
-	std::cout<<"type:"<<type<<std::endl;
-    std::cout<<"hostname:"<<hostname<<std::endl;
-	std::cout<<"database:"<<database<<std::endl;
-    std::cout<<"username:"<<username<<std::endl;
-    std::cout<<"password:"<<password<<std::endl;
-	std::cout<<"charset:"<<charset<<std::endl;*/
-
-
 }
 
 
-// Ğ´ÈëÊı¾İ
-BOOL CModel::Save(char* TableName, char* Params)
+// æ‰§è¡ŒSql (éœ€è‡ªè¡Œæ£€æŸ¥sqlè¯­å¥åˆç†æ€§)
+bool CModel::Execute(string Sql)
 {
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return false;
+	}
+
 	switch(Type)
 	{
 	case 1: // Sqlite
 		{
-			// ×ª»»ÎªCString
-			CString Table(TableName), Param(Params);
-
-			// ¼ì²éÄ¿±ê±í
-			if(!m_Sql.CheckDataTable(Table, true))
-				CController::OutPut("Êı¾İ±í%s²»´æÔÚ!", TableName);
-			else
-				// Ğ´ÈëÊı¾İ
-				return m_Sql.InsertData(Table, Param, true);
+			return m_sqlite.Execute(Sql);
 		}break;
 
 	case 2:
@@ -1253,27 +2535,42 @@ BOOL CModel::Save(char* TableName, char* Params)
 		break;
 	}
 
-	// Ä¬ÈÏ·µ»ØÊ§°Ü
-	return FALSE;
+	// é»˜è®¤è¿”å›å¤±è´¥
+	return false;
 }
 
 
-// É¾³ıÊı¾İ
-BOOL CModel::Delete(char* TableName, char* Params)
+// æŸ¥è¯¢Sql (éœ€è‡ªè¡Œæ£€æŸ¥sqlè¯­å¥åˆç†æ€§)
+bool CModel::Query(string Sql, vector<string> &Results)
 {
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return false;
+	}
+
 	switch(Type)
 	{
 	case 1: // Sqlite
 		{
-			// ×ª»»ÎªCString
-			CString Table(TableName), Param(Params);
+			Result* query = m_sqlite.Query(m_sqlite.db, Sql);
 
-			// ¼ì²éÄ¿±ê±í
-			if(!m_Sql.CheckDataTable(Table, true))
-				CController::OutPut("Êı¾İ±í%s²»´æÔÚ!", TableName);
-			else
-				// É¾³ıÊı¾İ
-				return m_Sql.DeleteData(Table, Param, true);
+			if(query)
+			{
+				int i=0;
+				while(query->next())
+				{
+					//string id = query->value("ID");
+					string result(query->pResult[i]);
+					Results.push_back(result);
+					i++;
+				}
+				delete query;
+				return true;
+			}
+
+			return false;
 		}break;
 
 	case 2:
@@ -1290,27 +2587,26 @@ BOOL CModel::Delete(char* TableName, char* Params)
 		break;
 	}
 
-	// Ä¬ÈÏ·µ»ØÊ§°Ü
-	return FALSE;
+	// é»˜è®¤è¿”å›å¤±è´¥
+	return false;
 }
 
 
-// ¸üĞÂÊı¾İ (µ¥Ìõ)
-BOOL CModel::UpDate(char* TableName, char* Columns, char* NewData, char* Params)
+// åˆ›å»ºæ•°æ®è¡¨
+bool CModel::Create(string TableName, string Params)
 {
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return false;
+	}
+
 	switch(Type)
 	{
 	case 1: // Sqlite
 		{
-			// ×ª»»ÎªCString
-			CString Table(TableName), Column(Columns), Data(NewData), Param(Params);
-
-			// ¼ì²éÄ¿±ê±í
-			if(!m_Sql.CheckDataTable(Table, true))
-				CController::OutPut("Êı¾İ±í%s²»´æÔÚ!", TableName);
-			else
-				// ¸üĞÂÊı¾İ
-				return m_Sql.UpdataData(Table, Column, Data, Param, true);
+			return m_sqlite.CreateDataTable(TableName, Params);
 		}break;
 
 	case 2:
@@ -1327,27 +2623,41 @@ BOOL CModel::UpDate(char* TableName, char* Columns, char* NewData, char* Params)
 		break;
 	}
 
-	// Ä¬ÈÏ·µ»ØÊ§°Ü
-	return FALSE;
+	// é»˜è®¤è¿”å›å¤±è´¥
+	return false;
 }
 
 
-// ¸üĞÂÊı¾İ (ÅúÁ¿)
-BOOL CModel::UpDate(char* TableName, char* Columns, char* Params)
+// åˆ é™¤æ•°æ®è¡¨
+bool CModel::Drop(string TableName)
 {
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return false;
+	}
+
 	switch(Type)
 	{
 	case 1: // Sqlite
 		{
-			// ×ª»»ÎªCString
-			CString Table(TableName), Column(Columns), Param(Params);
+			// æ£€æŸ¥ç›®æ ‡è¡¨
+			if(!m_sqlite.CheckDataTable(TableName))
+			{
+				char message[1024] = {0};
+				sprintf(message, "æ•°æ®è¡¨%sä¸å­˜åœ¨!", TableName.c_str());
 
-			// ¼ì²éÄ¿±ê±í
-			if(!m_Sql.CheckDataTable(Table, true))
-				CController::OutPut("Êı¾İ±í%s²»´æÔÚ!", TableName);
+				// è®°å½•æ—¥å¿—
+				CController::Record(message);
+
+				// è¾“å‡ºé”™è¯¯
+				CController::DisplayError(message);
+				return false;
+			}
 			else
-				// ¸üĞÂÊı¾İ
-				return m_Sql.UpdataData(Table, Column, Param, true);
+				// åˆ é™¤æ•°æ®è¡¨
+				return m_sqlite.DeleteDataTable(TableName);
 		}break;
 
 	case 2:
@@ -1364,41 +2674,359 @@ BOOL CModel::UpDate(char* TableName, char* Columns, char* Params)
 		break;
 	}
 
-	// Ä¬ÈÏ·µ»ØÊ§°Ü
-	return FALSE;
+	// é»˜è®¤è¿”å›å¤±è´¥
+	return false;
 }
 
 
-// »ñÈ¡Êı¾İ (µ¥Ìõ)
-char* CModel::Get(char* TableName, int Col, char* Params, char* Order, char* Limit, int SortMode, BOOL DISTINCT, char* COUNT, char* COLUMN, char* GROUP,  char* HAVING)
+// ä¿®æ”¹æ•°æ®è¡¨ (Operationå¯é€‰: é‡å‘½åè¡¨:REN_TABLE / æ·»åŠ åˆ—:ADD_COLUMN / åˆ é™¤åˆ—:DEL_COLUMN / ä¿®æ”¹åˆ—:REN_COLUMN)(NewParamsä»…ç”¨äºä¿®æ”¹åˆ—)
+bool CModel::Alter(string TableName, int Operation, string Params, string NewParams)
 {
-	// ¶¨Òå·µ»ØÖµ
-	char* result = "";
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return false;
+	}
 
 	switch(Type)
 	{
 	case 1: // Sqlite
 		{
-			// ×ª»»ÎªCString
-			CString Table(TableName), Result, Param(Params), pOrder(Order), pLimit(Limit), pCOUNT(COUNT), pCOLUMN(COLUMN), pGROUP(GROUP), pHAVING(HAVING);
+			// æ£€æŸ¥ç›®æ ‡è¡¨
+			if(!m_sqlite.CheckDataTable(TableName))
+			{
+				char message[1024] = {0};
+				sprintf(message, "æ•°æ®è¡¨%sä¸å­˜åœ¨!", TableName.c_str());
 
-			// ¼ì²éÄ¿±ê±í
-			if(!m_Sql.CheckDataTable(Table, true))
-				CController::OutPut("Êı¾İ±í%s²»´æÔÚ!", TableName);
+				// è®°å½•æ—¥å¿—
+				CController::Record(message);
+
+				// è¾“å‡ºé”™è¯¯
+				CController::DisplayError(message);
+				return false;
+			}
+			else
+				// ä¿®æ”¹æ•°æ®è¡¨
+				return m_sqlite.UpdataDataTable(TableName, Operation, Params, NewParams);
+		}break;
+
+	case 2:
+		{
+
+		}break;
+
+	case 3:
+		{
+
+		}break;
+
+	default:
+		break;
+	}
+
+	// é»˜è®¤è¿”å›å¤±è´¥
+	return false;
+}
+
+
+// æ£€æŸ¥æ•°æ®è¡¨æ˜¯å¦å­˜åœ¨
+bool CModel::Exist(string TableName)
+{
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return false;
+	}
+
+	switch(Type)
+	{
+	case 1: // Sqlite
+		{
+			// æ£€æŸ¥ç›®æ ‡è¡¨
+			return m_sqlite.CheckDataTable(TableName);
+		}break;
+
+	case 2:
+		{
+
+		}break;
+
+	case 3:
+		{
+
+		}break;
+
+	default:
+		break;
+	}
+
+	// é»˜è®¤è¿”å›å¤±è´¥
+	return false;
+}
+
+
+// å†™å…¥æ•°æ®
+bool CModel::Save(string TableName, string Params)
+{
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return false;
+	}
+
+	switch(Type)
+	{
+	case 1: // Sqlite
+		{
+			// æ£€æŸ¥ç›®æ ‡è¡¨
+			if(!m_sqlite.CheckDataTable(TableName))
+			{
+				char message[1024] = {0};
+				sprintf(message, "æ•°æ®è¡¨%sä¸å­˜åœ¨!", TableName.c_str());
+
+				// è®°å½•æ—¥å¿—
+				CController::Record(message);
+
+				// è¾“å‡ºé”™è¯¯
+				CController::DisplayError(message);
+				return false;
+			}
+			else
+				// å†™å…¥æ•°æ®
+				return m_sqlite.InsertData(TableName, Params);
+		}break;
+
+	case 2:
+		{
+
+		}break;
+
+	case 3:
+		{
+
+		}break;
+
+	default:
+		break;
+	}
+
+	// é»˜è®¤è¿”å›å¤±è´¥
+	return false;
+}
+
+
+// åˆ é™¤æ•°æ®
+bool CModel::Delete(string TableName, string Params)
+{
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return false;
+	}
+
+	switch(Type)
+	{
+	case 1: // Sqlite
+		{
+			// æ£€æŸ¥ç›®æ ‡è¡¨
+			if(!m_sqlite.CheckDataTable(TableName))
+			{
+				char message[1024] = {0};
+				sprintf(message, "æ•°æ®è¡¨%sä¸å­˜åœ¨!", TableName.c_str());
+
+				// è®°å½•æ—¥å¿—
+				CController::Record(message);
+
+				// è¾“å‡ºé”™è¯¯
+				CController::DisplayError(message);
+				return false;
+			}
+			else if( !Check(TableName, Params) )
+			{
+				CController::Record("ç›®æ ‡æ•°æ®ä¸å­˜åœ¨, æ— æ³•åˆ é™¤!");
+				CController::DisplayError("ç›®æ ‡æ•°æ®ä¸å­˜åœ¨, æ— æ³•åˆ é™¤!");
+				return false;
+			}
+			else
+				// åˆ é™¤æ•°æ®
+				return m_sqlite.DeleteData(TableName, Params);
+		}break;
+
+	case 2:
+		{
+
+		}break;
+
+	case 3:
+		{
+
+		}break;
+
+	default:
+		break;
+	}
+
+	// é»˜è®¤è¿”å›å¤±è´¥
+	return false;
+}
+
+
+// æ›´æ–°æ•°æ® (å•æ¡)
+bool CModel::UpDate(string TableName, string Columns, string NewData, string Params)
+{
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return false;
+	}
+
+	switch(Type)
+	{
+	case 1: // Sqlite
+		{
+			// æ£€æŸ¥ç›®æ ‡è¡¨
+			if(!m_sqlite.CheckDataTable(TableName))
+			{
+				char message[1024] = {0};
+				sprintf(message, "æ•°æ®è¡¨%sä¸å­˜åœ¨!", TableName.c_str());
+
+				// è®°å½•æ—¥å¿—
+				CController::Record(message);
+
+				// è¾“å‡ºé”™è¯¯
+				CController::DisplayError(message);
+				return false;
+			}
+			else if( !Check(TableName, Params) )
+			{
+				CController::Record("ç›®æ ‡æ•°æ®ä¸å­˜åœ¨, æ— æ³•æ›´æ–°!");
+				CController::DisplayError("ç›®æ ‡æ•°æ®ä¸å­˜åœ¨, æ— æ³•æ›´æ–°!");
+				return false;
+			}
+			else
+				// æ›´æ–°æ•°æ®
+				return m_sqlite.UpdataData(TableName, Columns, NewData, Params);
+		}break;
+
+	case 2:
+		{
+
+		}break;
+
+	case 3:
+		{
+
+		}break;
+
+	default:
+		break;
+	}
+
+	// é»˜è®¤è¿”å›å¤±è´¥
+	return false;
+}
+
+
+// æ›´æ–°æ•°æ® (æ‰¹é‡)
+bool CModel::UpDate(string TableName, string Columns, string Params)
+{
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return false;
+	}
+
+	switch(Type)
+	{
+	case 1: // Sqlite
+		{
+			// æ£€æŸ¥ç›®æ ‡è¡¨
+			if(!m_sqlite.CheckDataTable(TableName))
+			{
+				char message[1024] = {0};
+				sprintf(message, "æ•°æ®è¡¨%sä¸å­˜åœ¨!", TableName.c_str());
+
+				// è®°å½•æ—¥å¿—
+				CController::Record(message);
+
+				// è¾“å‡ºé”™è¯¯
+				CController::DisplayError(message);
+				return false;
+			}
+			else
+				// æ›´æ–°æ•°æ®
+				return m_sqlite.UpdataData(TableName, Columns, Params);
+		}break;
+
+	case 2:
+		{
+
+		}break;
+
+	case 3:
+		{
+
+		}break;
+
+	default:
+		break;
+	}
+
+	// é»˜è®¤è¿”å›å¤±è´¥
+	return false;
+}
+
+
+// è·å–æ•°æ® (å•æ¡)
+string CModel::Get(string TableName, string Column, string Params, string Order, string Limit, int SortMode, bool DISTINCT, string COUNT, string COLUMN, string GROUP, string HAVING)
+{
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return "";
+	}
+
+	// å®šä¹‰è¿”å›å€¼
+	string pResult = "";
+
+	switch(Type)
+	{
+	case 1: // Sqlite
+		{
+			// æ£€æŸ¥ç›®æ ‡è¡¨
+			if(!m_sqlite.CheckDataTable(TableName))
+			{
+				char message[1024] = {0};
+				sprintf(message, "æ•°æ®è¡¨%sä¸å­˜åœ¨!", TableName.c_str());
+
+				// è®°å½•æ—¥å¿—
+				CController::Record(message);
+
+				// è¾“å‡ºé”™è¯¯
+				CController::DisplayError(message);
+				return false;
+			}
 			else
 			{
-				// »ñÈ¡Êı¾İ
-				if( m_Sql.SelectData(Table, Result, Col, Param, true, pOrder, pLimit, SortMode, DISTINCT, pCOUNT, pCOLUMN, pGROUP, pHAVING) )
+				// è·å–æ•°æ®
+				if( m_sqlite.SelectData(TableName, pResult, Column, Params, Order, Limit, SortMode, DISTINCT, COUNT, COLUMN, GROUP, HAVING) )
 				{
-					//´ÓÕâÀï¿ªÊ¼½øĞĞ×ª»¯£¬ÕâÊÇÒ»¸öºê¶¨Òå
-					USES_CONVERSION;
+					//ä»è¿™é‡Œå¼€å§‹è¿›è¡Œè½¬åŒ–ï¼Œè¿™æ˜¯ä¸€ä¸ªå®å®šä¹‰
+					//USES_CONVERSION;
 
-					//½øĞĞ×ª»»
-					char* pResult = T2A(Result.GetBuffer(0));
-					Result.ReleaseBuffer();
+					////è¿›è¡Œè½¬æ¢
+					//char* pResult = T2A(Result.GetBuffer(0));
+					//Result.ReleaseBuffer();
 
-					// Îª½á¹û¸³Öµ
-					result = pResult;
+					// è¿”å›ç»“æœ
+					return pResult;
 				}
 				else
 					return "";
@@ -1419,46 +3047,58 @@ char* CModel::Get(char* TableName, int Col, char* Params, char* Order, char* Lim
 		break;
 	}
 
-	// ·µ»Ø½á¹û
-	return result;
+	// è¿”å›ç»“æœ
+	return pResult;
 }
 
 
-// »ñÈ¡Êı¾İ (ÅúÁ¿)
-vector<char*> CModel::GetAll(char* TableName, int Col, char* Params, char* Order, char* Limit, int SortMode, BOOL DISTINCT, char* COUNT, char* COLUMN, char* GROUP,  char* HAVING)
+// è·å–æ•°æ® (æ‰¹é‡)
+vector<string> CModel::GetAll(string TableName, string Params, string Order, string Limit, int SortMode, bool DISTINCT, string COUNT, string COLUMN, string GROUP, string HAVING)
 {
-	// Á´±í¶ÔÏó
-	vector<char*>   Result;
-	vector<CString> Temp;
+	// é“¾è¡¨å¯¹è±¡
+	vector<string> Result;
+	vector<string> Temp;
+
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return Result;
+	}
 
 	switch(Type)
 	{
 	case 1: // Sqlite
 		{
-			// ×ª»»ÎªCString
-			CString Table(TableName), Param(Params), pOrder(Order), pLimit(Limit), pCOUNT(COUNT), pCOLUMN(COLUMN), pGROUP(GROUP), pHAVING(HAVING);
+			// æ£€æŸ¥ç›®æ ‡è¡¨
+			if(!m_sqlite.CheckDataTable(TableName))
+			{
+				char message[1024] = {0};
+				sprintf(message, "æ•°æ®è¡¨%sä¸å­˜åœ¨!", TableName.c_str());
 
-			// ¼ì²éÄ¿±ê±í
-			if(!m_Sql.CheckDataTable(Table, true))
-				CController::OutPut("Êı¾İ±í%s²»´æÔÚ!", TableName);
+				// è®°å½•æ—¥å¿—
+				CController::Record(message);
+
+				// è¾“å‡ºé”™è¯¯
+				CController::DisplayError(message);
+				return Result;
+			}
 			else
 			{
-				// »ñÈ¡Êı¾İ
-				if( m_Sql.SelectData(Table, Temp, Param, true, pOrder, pLimit, SortMode, DISTINCT, pCOUNT, pCOLUMN, pGROUP, pHAVING) )
+				// å¾—åˆ°åˆ—æ•°
+				int Col = 0;
+				m_sqlite.CountColName(TableName, Col);
+
+				// è·å–æ•°æ®
+				if( m_sqlite.SelectData(TableName, Temp, Params, Order, Limit, SortMode, DISTINCT, COUNT, COLUMN, GROUP, HAVING) )
 				{
 					for(int i = 0; i < (int)Temp.size(); i += Col)
 					{
-						//´ÓÕâÀï¿ªÊ¼½øĞĞ×ª»¯£¬ÕâÊÇÒ»¸öºê¶¨Òå
-						USES_CONVERSION;
-
-						//½øĞĞ×ª»»
+						//è¿›è¡Œè½¬æ¢
 						for(int j = 0; j < Col; j++)
 						{
-							char* temp = T2A(Temp.at(i + j).GetBuffer(0));
-							Temp.at(i + j).ReleaseBuffer();
-
-							// ·Å½øÄ¿±êÁ´±íÖĞ
-							Result.push_back(temp);
+							// æ”¾è¿›ç›®æ ‡é“¾è¡¨ä¸­
+							Result.push_back(Temp.at(i + j));
 						}
 					}
 				}
@@ -1479,31 +3119,101 @@ vector<char*> CModel::GetAll(char* TableName, int Col, char* Params, char* Order
 		break;
 	}
 
-	// ·µ»Ø²éÑ¯½á¹û
+	// è¿”å›æŸ¥è¯¢ç»“æœ
 	return Result;
 }
 
 
-// Í³¼ÆÊı¾İ
-int CModel::Count(char* TableName, char* Params)
+// æ£€æŸ¥æ•°æ®é¡¹æ˜¯å¦å­˜åœ¨
+bool CModel::Check(string TableName, string Params)
 {
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return false;
+	}
+
 	switch(Type)
 	{
 	case 1: // Sqlite
 		{
-			// ×ª»»ÎªCString
-			CString Table(TableName), Param(Params);
-			
-			// ¼ì²éÄ¿±ê±í
-			if(!m_Sql.CheckDataTable(Table, true))
-				CController::OutPut("Êı¾İ±í%s²»´æÔÚ!", TableName);
+			// æ£€æŸ¥ç›®æ ‡è¡¨
+			if(!m_sqlite.CheckDataTable(TableName))
+			{
+				char message[1024] = {0};
+				sprintf(message, "æ•°æ®è¡¨%sä¸å­˜åœ¨!", TableName.c_str());
+
+				// è®°å½•æ—¥å¿—
+				CController::Record(message);
+
+				// è¾“å‡ºé”™è¯¯
+				CController::DisplayError(message);
+				return false;
+			}
 			else
 			{
-				// ¶¨Òå·µ»Ø¶ÔÏó
+				// æ£€æŸ¥æ•°æ®
+				if( m_sqlite.CheckData(TableName, "", Params) )
+					return true;
+				else
+					return false;
+			}
+		}break;
+
+	case 2:
+		{
+
+		}break;
+
+	case 3:
+		{
+
+		}break;
+
+	default:
+		break;
+	}
+
+	// é»˜è®¤è¿”å›å€¼
+	return false;
+}
+
+
+// ç»Ÿè®¡æ•°æ®
+int CModel::Count(string TableName, string Params)
+{
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return -1;
+	}
+
+	switch(Type)
+	{
+	case 1: // Sqlite
+		{
+			// æ£€æŸ¥ç›®æ ‡è¡¨
+			if(!m_sqlite.CheckDataTable(TableName))
+			{
+				char message[1024] = {0};
+				sprintf(message, "æ•°æ®è¡¨%sä¸å­˜åœ¨!", TableName.c_str());
+
+				// è®°å½•æ—¥å¿—
+				CController::Record(message);
+
+				// è¾“å‡ºé”™è¯¯
+				CController::DisplayError(message);
+				return -1;
+			}
+			else
+			{
+				// å®šä¹‰è¿”å›å¯¹è±¡
 				int Count;
 
-				// Í³¼ÆÊı¾İ
-				if( m_Sql.CountNumber(Table, Param, Count, true) )
+				// ç»Ÿè®¡æ•°æ®
+				if( m_sqlite.CountData(TableName, Params, Count) )
 					return Count;
 				else
 					return -1;
@@ -1524,31 +3234,458 @@ int CModel::Count(char* TableName, char* Params)
 		break;
 	}
 
-	// Ä¬ÈÏ·µ»ØÊ§°Ü
-	return FALSE;
+	// é»˜è®¤è¿”å›
+	return -1;
 }
 
 
-// Êı¾İÇóºÍ
-int CModel::Sum(char* TableName, char* Column, char* Params)
+// æ•°æ®æ±‚å’Œ
+double CModel::Sum(string TableName, string Column, string Params)
 {
-	// ¶¨Òå·µ»Ø¶ÔÏó
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return -1;
+	}
+
+	// å®šä¹‰è¿”å›å¯¹è±¡
+	double Data = 0.00;
+
+	switch(Type)
+	{
+	case 1: // Sqlite
+		{
+			// æ£€æŸ¥ç›®æ ‡è¡¨
+			if(!m_sqlite.CheckDataTable(TableName))
+			{
+				char message[1024] = {0};
+				sprintf(message, "æ•°æ®è¡¨%sä¸å­˜åœ¨!", TableName.c_str());
+
+				// è®°å½•æ—¥å¿—
+				CController::Record(message);
+
+				// è¾“å‡ºé”™è¯¯
+				CController::DisplayError(message);
+				return -1;
+			}
+			else
+			{
+				// æ•°æ®æ±‚å’Œ
+				if( m_sqlite.SumData(TableName, Column, Params, Data) )
+					return Data;
+				else
+					return -1;
+			}
+		}break;
+
+	case 2:
+		{
+
+		}break;
+
+	case 3:
+		{
+
+		}break;
+
+	default:
+		break;
+	}
+
+	// é»˜è®¤è¿”å›å¤±è´¥
+	return -1;
+}
+
+
+// æ•°æ®æ±‚ç§¯
+double CModel::Product(string TableName, string Column, string Params)
+{
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return -1;
+	}
+
+	// å®šä¹‰è¿”å›å¯¹è±¡
+	double Data = 1.00;
+
+	switch(Type)
+	{
+	case 1: // Sqlite
+		{
+			// æ£€æŸ¥ç›®æ ‡è¡¨
+			if(!m_sqlite.CheckDataTable(TableName))
+			{
+				char message[1024] = {0};
+				sprintf(message, "æ•°æ®è¡¨%sä¸å­˜åœ¨!", TableName.c_str());
+
+				// è®°å½•æ—¥å¿—
+				CController::Record(message);
+
+				// è¾“å‡ºé”™è¯¯
+				CController::DisplayError(message);
+				return false;
+			}
+			else
+			{
+				// æ•°æ®æ±‚ç§¯
+				if( m_sqlite.ProductData(TableName, Column, Params, Data) )
+					return Data;
+				else
+					return -1;
+			}
+		}break;
+
+	case 2:
+		{
+
+		}break;
+
+	case 3:
+		{
+
+		}break;
+
+	default:
+		break;
+	}
+
+	// é»˜è®¤è¿”å›å¤±è´¥
+	return -1;
+}
+
+
+// æ±‚å¹³å‡æ•°
+double CModel::Avg(string TableName, string Column, string Params)
+{
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return -1;
+	}
+
+	// å®šä¹‰è¿”å›å¯¹è±¡
+	double Data = 0.00;
+
+	switch(Type)
+	{
+	case 1: // Sqlite
+		{
+			// æ£€æŸ¥ç›®æ ‡è¡¨
+			if(!m_sqlite.CheckDataTable(TableName))
+			{
+				char message[1024] = {0};
+				sprintf(message, "æ•°æ®è¡¨%sä¸å­˜åœ¨!", TableName.c_str());
+
+				// è®°å½•æ—¥å¿—
+				CController::Record(message);
+
+				// è¾“å‡ºé”™è¯¯
+				CController::DisplayError(message);
+				return -1;
+			}
+			else
+			{
+				// ç»Ÿè®¡æ•°æ®
+				if( m_sqlite.AvgData(TableName, Column, Params, Data) )
+					return Data;
+				else
+					return -1;
+			}
+		}break;
+
+	case 2:
+		{
+
+		}break;
+
+	case 3:
+		{
+
+		}break;
+
+	default:
+		break;
+	}
+
+	// é»˜è®¤è¿”å›å¤±è´¥
+	return -1;
+}
+
+
+// æ±‚å‡ºä¼—æ•°
+double CModel::Plu(string TableName, string Column, string Params)
+{
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return -1;
+	}
+
+	// å®šä¹‰è¿”å›å¯¹è±¡
+	double Data = 0.00;
+
+	switch(Type)
+	{
+	case 1: // Sqlite
+		{
+			// æ£€æŸ¥ç›®æ ‡è¡¨
+			if(!m_sqlite.CheckDataTable(TableName))
+			{
+				char message[1024] = {0};
+				sprintf(message, "æ•°æ®è¡¨%sä¸å­˜åœ¨!", TableName.c_str());
+
+				// è®°å½•æ—¥å¿—
+				CController::Record(message);
+
+				// è¾“å‡ºé”™è¯¯
+				CController::DisplayError(message);
+				return -1;
+			}
+			else
+			{
+				// ç»Ÿè®¡æ•°æ®
+				if( m_sqlite.PluData(TableName, Column, Params, Data) )
+					return Data;
+				else
+					return -1;
+			}
+		}break;
+
+	case 2:
+		{
+
+		}break;
+
+	case 3:
+		{
+
+		}break;
+
+	default:
+		break;
+	}
+
+	// é»˜è®¤è¿”å›å¤±è´¥
+	return -1;
+}
+
+
+// æ±‚ä¸­ä½æ•°
+double CModel::Mid(string TableName, string Column, string Params)
+{
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return -1;
+	}
+
+	// å®šä¹‰è¿”å›å¯¹è±¡
+	double Data = 0.00;
+
+	switch(Type)
+	{
+	case 1: // Sqlite
+		{
+			// æ£€æŸ¥ç›®æ ‡è¡¨
+			if(!m_sqlite.CheckDataTable(TableName))
+			{
+				char message[1024] = {0};
+				sprintf(message, "æ•°æ®è¡¨%sä¸å­˜åœ¨!", TableName.c_str());
+
+				// è®°å½•æ—¥å¿—
+				CController::Record(message);
+
+				// è¾“å‡ºé”™è¯¯
+				CController::DisplayError(message);
+				return -1;
+			}
+			else
+			{
+				// ç»Ÿè®¡æ•°æ®
+				if( m_sqlite.MidData(TableName, Column, Params, Data) )
+					return Data;
+				else
+					return -1;
+			}
+		}break;
+
+	case 2:
+		{
+
+		}break;
+
+	case 3:
+		{
+
+		}break;
+
+	default:
+		break;
+	}
+
+	// é»˜è®¤è¿”å›å¤±è´¥
+	return -1;
+}
+
+
+// æ±‚æœ€å¤§å€¼
+double CModel::Max(string TableName, string Column, string Params)
+{
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return -1;
+	}
+
+	// å®šä¹‰è¿”å›å¯¹è±¡
+	double Data = 0.00;
+
+	switch(Type)
+	{
+	case 1: // Sqlite
+		{
+			// æ£€æŸ¥ç›®æ ‡è¡¨
+			if(!m_sqlite.CheckDataTable(TableName))
+			{
+				char message[1024] = {0};
+				sprintf(message, "æ•°æ®è¡¨%sä¸å­˜åœ¨!", TableName.c_str());
+
+				// è®°å½•æ—¥å¿—
+				CController::Record(message);
+
+				// è¾“å‡ºé”™è¯¯
+				CController::DisplayError(message);
+				return -1;
+			}
+			else
+			{
+				// ç»Ÿè®¡æ•°æ®
+				if( m_sqlite.MaxData(TableName, Column, Params, Data) )
+					return Data;
+				else
+					return -1;
+			}
+		}break;
+
+	case 2:
+		{
+
+		}break;
+
+	case 3:
+		{
+
+		}break;
+
+	default:
+		break;
+	}
+
+	// é»˜è®¤è¿”å›å¤±è´¥
+	return -1;
+}
+
+
+// æ±‚æœ€å°å€¼
+double CModel::Min(string TableName, string Column, string Params)
+{
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return -1;
+	}
+
+	// å®šä¹‰è¿”å›å¯¹è±¡
+	double Data = 0.00;
+
+	switch(Type)
+	{
+	case 1: // Sqlite
+		{
+			// æ£€æŸ¥ç›®æ ‡è¡¨
+			if(!m_sqlite.CheckDataTable(TableName))
+			{
+				char message[1024] = {0};
+				sprintf(message, "æ•°æ®è¡¨%sä¸å­˜åœ¨!", TableName.c_str());
+
+				// è®°å½•æ—¥å¿—
+				CController::Record(message);
+
+				// è¾“å‡ºé”™è¯¯
+				CController::DisplayError(message);
+				return -1;
+			}
+			else
+			{
+				// ç»Ÿè®¡æ•°æ®
+				if( m_sqlite.MinData(TableName, Column, Params, Data) )
+					return Data;
+				else
+					return -1;
+			}
+		}break;
+
+	case 2:
+		{
+
+		}break;
+
+	case 3:
+		{
+
+		}break;
+
+	default:
+		break;
+	}
+
+	// é»˜è®¤è¿”å›å¤±è´¥
+	return -1;
+}
+
+
+// æ±‚éšæœºå€¼
+int CModel::Rand(string TableName, string Column, string Params)
+{
+	if(!Initialize)
+	{
+		CController::Record("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		CController::DisplayError("æ•°æ®åº“åˆå§‹åŒ–é”™è¯¯!");
+		return -1;
+	}
+
+	// å®šä¹‰è¿”å›å¯¹è±¡
 	int Data = 0;
 
 	switch(Type)
 	{
 	case 1: // Sqlite
 		{
-			// ×ª»»ÎªCString
-			CString Table(TableName), pColumn(Column), Param(Params);
+			// æ£€æŸ¥ç›®æ ‡è¡¨
+			if(!m_sqlite.CheckDataTable(TableName))
+			{
+				char message[1024] = {0};
+				sprintf(message, "æ•°æ®è¡¨%sä¸å­˜åœ¨!", TableName.c_str());
 
-			// ¼ì²éÄ¿±ê±í
-			if(!m_Sql.CheckDataTable(Table, true))
-				CController::OutPut("Êı¾İ±í%s²»´æÔÚ!", TableName);
+				// è®°å½•æ—¥å¿—
+				CController::Record(message);
+
+				// è¾“å‡ºé”™è¯¯
+				CController::DisplayError(message);
+				return -1;
+			}
 			else
 			{
-				// Êı¾İÇóºÍ
-				if( m_Sql.SumData(Table, pColumn, Param, Data, true) )
+				// ç»Ÿè®¡æ•°æ®
+				if( m_sqlite.RandData(TableName, Column, Params, Data) )
 					return Data;
 				else
 					return -1;
@@ -1569,144 +3706,6 @@ int CModel::Sum(char* TableName, char* Column, char* Params)
 		break;
 	}
 
-	// Ä¬ÈÏ·µ»ØÊ§°Ü
+	// é»˜è®¤è¿”å›
 	return -1;
 }
-
-
-// Êı¾İÇó»ı
-int CModel::Product(char* TableName, char* Column, char* Params)
-{
-	// ¶¨Òå·µ»Ø¶ÔÏó
-	int Data = 1;
-
-	switch(Type)
-	{
-	case 1: // Sqlite
-		{
-			// ×ª»»ÎªCString
-			CString Table(TableName), pColumn(Column), Param(Params);
-
-			// ¼ì²éÄ¿±ê±í
-			if(!m_Sql.CheckDataTable(Table, true))
-				CController::OutPut("Êı¾İ±í%s²»´æÔÚ!", TableName);
-			else
-			{
-				// Êı¾İÇó»ı
-				if( m_Sql.ProductData(Table, pColumn, Param, Data, true) )
-					return Data;
-				else
-					return -1;
-			}
-		}break;
-
-	case 2:
-		{
-
-		}break;
-
-	case 3:
-		{
-
-		}break;
-
-	default:
-		break;
-	}
-
-	// Ä¬ÈÏ·µ»ØÊ§°Ü
-	return -1;
-}
-
-
-// ÇóÆ½¾ùÊı
-int CModel::Avg(char* TableName, char* Column, char* Params)
-{
-	// ¶¨Òå·µ»Ø¶ÔÏó
-	int Data = 0;
-
-	switch(Type)
-	{
-	case 1: // Sqlite
-		{
-			// ×ª»»ÎªCString
-			CString Table(TableName), pColumn(Column), Param(Params);
-
-			// ¼ì²éÄ¿±ê±í
-			if(!m_Sql.CheckDataTable(Table, true))
-				CController::OutPut("Êı¾İ±í%s²»´æÔÚ!", TableName);
-			else
-			{
-				// Í³¼ÆÊı¾İ
-				if( m_Sql.AvgData(Table, pColumn, Param, Data, true) )
-					return Data;
-				else
-					return -1;
-			}
-		}break;
-
-	case 2:
-		{
-
-		}break;
-
-	case 3:
-		{
-
-		}break;
-
-	default:
-		break;
-	}
-
-	// Ä¬ÈÏ·µ»ØÊ§°Ü
-	return -1;
-}
-
-
-// ÇóÖĞÎ»Êı
-int CModel::Mid(char* TableName, char* Column, char* Params)
-{
-	// ¶¨Òå·µ»Ø¶ÔÏó
-	int Data = 0;
-
-	switch(Type)
-	{
-	case 1: // Sqlite
-		{
-			// ×ª»»ÎªCString
-			CString Table(TableName), pColumn(Column), Param(Params);
-
-			// ¼ì²éÄ¿±ê±í
-			if(!m_Sql.CheckDataTable(Table, true))
-				CController::OutPut("Êı¾İ±í%s²»´æÔÚ!", TableName);
-			else
-			{
-				// Í³¼ÆÊı¾İ
-				if( m_Sql.MidData(Table, pColumn, Param, Data, true) )
-					return Data;
-				else
-					return -1;
-			}
-		}break;
-
-	case 2:
-		{
-
-		}break;
-
-	case 3:
-		{
-
-		}break;
-
-	default:
-		break;
-	}
-
-	// Ä¬ÈÏ·µ»ØÊ§°Ü
-	return -1;
-}
-
-/***************************************************************************************************************************************************************************************************/
-

@@ -1,68 +1,72 @@
-#pragma once
-/* Sqlite Êı¾İ¿â¹ÜÀí
- * ÓÃÍ¾: ²Ù×÷SqliteÊı¾İ¿â
- * ×÷Õß: ×Ï»Ô(×ÏÓ°Áú)
- * ÈÕÆÚ: 2018-6-22
- * °æÈ¨ËùÓĞ 2016 - 2018 ×ÏÓ°Áú¹¤×÷ÊÒ
+ï»¿#pragma once
+/* Sqlite æ•°æ®åº“ç®¡ç†
+ * ç”¨é€”: æ“ä½œSqliteæ•°æ®åº“
+ * ä½œè€…: ç´«è¾‰(ç´«å½±é¾™)
+ * æ—¥æœŸ: 2018-6-22
+ * ç‰ˆæƒæ‰€æœ‰ 2016 - 2019 ç´«å½±é¾™å·¥ä½œå®¤
  * https://www.shadowviolet.com
  */
 
-
-// ÒıÓÃÊı¾İ¿âÍ·ÎÄ¼şÖ§³ÖÊı¾İ¿â²Ù×÷
-#include "sqlite3.h"
-using namespace SqliteSpace;
+// å¼•ç”¨æ•°æ®åº“å¤´æ–‡ä»¶æ”¯æŒæ•°æ®åº“æ“ä½œ
+#include "sqlite3/sqlite3.h"
 
 
-// ÒıÓÃ×Ö·û´®¿âÍ·ÎÄ¼şºÍÃû×Ö¿Õ¼ä
+// å¼•ç”¨å­—ç¬¦ä¸²åº“å¤´æ–‡ä»¶å’Œåå­—ç©ºé—´
 #include "iostream"
 #include <algorithm>
 using namespace std;
 
-#include <string>  
-#include <xstring>  
-using std::string;
-using std::wstring;
+#include<cstdlib>
+#include<ctime>
 
-// ÒıÓÃÁ´±í¿âÍ·ÎÄ¼şºÍÃû×Ö¿Õ¼ä
-#include <afxtempl.h>
+#ifdef _WIN32
+#include <string>
+using std::string;
+#endif
+
+#ifdef __linux
+#include <cstring>  
+using std::strcmp;
+#endif
+
+// å¼•ç”¨é“¾è¡¨åº“å¤´æ–‡ä»¶å’Œåå­—ç©ºé—´
 #include <vector>
 using std::vector;
 
 
+// å®šä¹‰ ModifyDataTable çš„å‚æ•°
 
-// ¶¨Òå ModifyDataTable µÄ²ÎÊı
-
-// --------- Êı¾İ±í²Ù×÷ ---------|
+// --------- æ•°æ®è¡¨æ“ä½œ ---------|
                               // |
-// ÖØÃüÃû±í                      |
+// é‡å‘½åè¡¨                      |
 #define REN_TABLE  0x3000     // |
 // ------------------------------|
-// Ìí¼ÓÁĞ                        |
+// æ·»åŠ åˆ—                        |
 #define ADD_COLUMN 0x3001     // |
 // ------------------------------|
-// É¾³ıÁĞ                        |
+// åˆ é™¤åˆ—                        |
 #define DEL_COLUMN 0x3002     // |
 // ------------------------------|
-// ĞŞ¸ÄÁĞ                        |
+// ä¿®æ”¹åˆ—                        |
 #define REN_COLUMN 0x3003     // |
                               // |
 // ------------------------------|
 
 
-// ¶¨Òå SelectData µÄ²ÎÊı
+// å®šä¹‰ SelectData çš„å‚æ•°
 
-// ---------- ÅÅĞòÄ£Ê½ ----------|
+// ---------- æ’åºæ¨¡å¼ ----------|
                               // |
-// ÉıĞòÅÅÁĞ                      |
+// å‡åºæ’åˆ—                      |
 #define MOD_ASC    0x4000     // |
 // ------------------------------|
-// ½µĞòÅÅÁĞ                      |
+// é™åºæ’åˆ—                      |
 #define MOD_DESC   0x4001     // |
                               // |
 // ------------------------------|
 
 
-// ¶¨Òå²éÑ¯¶ÔÏó
+// å®šä¹‰æŸ¥è¯¢å¯¹è±¡
 typedef struct qureyResult
 {
 	int nRow;
@@ -127,368 +131,250 @@ typedef struct qureyResult
 } Result;
 
 
-// CSqliteManager Êı¾İ¿â²Ù×÷Àà
+// CSqliteManager æ•°æ®åº“æ“ä½œç±»
 class CSqliteManager
 {
-private: bool Init;
+private:
+	// æ ‡ç¤ºæ•°æ®åº“è¿æ¥æ˜¯å¦æˆåŠŸ
+	static bool IsConnect;
 
 public:
-	/////////////////////////////////////¹¹ÔìÓëÕÛ¹¹//////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////æ„é€ ä¸æŠ˜æ„//////////////////////////////////////////////////////////////////////////
 
-	// Ä¬ÈÏ¹¹Ôìº¯Êı
-	CSqliteManager(bool Console = FALSE);
+	// é»˜è®¤æ„é€ å‡½æ•°
+	CSqliteManager();
 
-	// ´øÊı¾İ¿âÃû³ÆºÍÂ·¾¶²ÎÊıµÄ¹¹Ôìº¯Êı
-	CSqliteManager(CString Name, CString Path, bool Console = false);
+	// å¸¦æ•°æ®åº“åç§°å’Œè·¯å¾„å‚æ•°çš„æ„é€ å‡½æ•°
+	CSqliteManager(string Path);
 
-	// Ä¬ÈÏÕÛ¹¹º¯Êı
+	// é»˜è®¤æŠ˜æ„å‡½æ•°
 	virtual ~CSqliteManager();
 
-	/////////////////////////////////////Àà³ÉÔ±±äÁ¿//////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////ç±»æˆå‘˜å˜é‡//////////////////////////////////////////////////////////////////////////
 
-	// Êı¾İ¿â¶ÔÏó±äÁ¿
+	// æ•°æ®åº“å¯¹è±¡å˜é‡
 	static sqlite3 *db;
 
-	// Êı¾İ¿â¼ÇÂ¼¼¯±äÁ¿
+	// æ•°æ®åº“è®°å½•é›†å˜é‡
 	static sqlite3_stmt * stmt;
 
-	// Êı¾İ¿â´íÎóĞÅÏ¢±äÁ¿
+	// æ•°æ®åº“é”™è¯¯ä¿¡æ¯å˜é‡
 	static char * errMsg;
 
-	// ¼ÇÂ¼¼¯
+	// è®°å½•é›†
 	static char **pRes;
 
-	// ÁĞ¶ÔÏó
+	// åˆ—å¯¹è±¡
 	static int nRow, nCol;
 
-	// ±êÊ¾Êı¾İ¿âÁ¬½ÓÊÇ·ñ³É¹¦
-	static BOOL IsConnect;
-
-	// ¿ØÖÆÌ¨±êÊ¶
-	static bool IsConsole;
-
-	// Êı¾İ¿â°æ±¾ºÅ
+	// æ•°æ®åº“ç‰ˆæœ¬å·
 	static int version;
 
-	// ²éÑ¯½á¹ûÁ´±í
-	static CList <CString, CString&> pResult;
-
-	/////////////////////////////////////Àà³ÉÔ±·½·¨//////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////ç±»æˆå‘˜æ–¹æ³•//////////////////////////////////////////////////////////////////////////
 	
 
-	////////////////////////////////////²ÎÊı½âÎö´úÂë/////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////å‚æ•°è§£æä»£ç /////////////////////////////////////////////////////////////////////////
 
 
-	// ²éÕÒ²ÎÊı¸öÊı
-	static int FindCharCount(CString csStr, char c);
+	// æŸ¥æ‰¾å‚æ•°ä¸ªæ•°
+	static int FindCharCount(string csStr, char c);
 
-	// ·Ö¸î×Ö·û´®
-	static void Split(CString source, CString divKey, CStringArray &dest);
+	// åˆ†å‰²å­—ç¬¦ä¸²
+	//static void Split(CString source, string divKey, stringArray &dest);
 
-	//ÓÃÓÚ¼ÆËãÎÄ¼ş¼ĞÄÚµÄÎÄ¼şÊıÁ¿
-	static int CountFile(CString Path);
+	//ç”¨äºè®¡ç®—æ–‡ä»¶å¤¹å†…çš„æ–‡ä»¶æ•°é‡
+	//static int CountFile(string Path);
 
-	////////////////////////////////////ÊÂÎï´¦Àí´úÂë/////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////äº‹ç‰©å¤„ç†ä»£ç /////////////////////////////////////////////////////////////////////////
 
-	//¿ªÆôÊÂÎñ  
+	//å¼€å¯äº‹åŠ¡  
 	static bool transaction(sqlite3 *p);
 
-	//Ìá½»ÊÂÎñ  
+	//æäº¤äº‹åŠ¡  
 	static bool commitTransaction(sqlite3 *p);
 
-	//»Ø¹öÊÂÎï  
+	//å›æ»šäº‹ç‰©  
 	static bool rollbackTransaction(sqlite3 *p);
 
-	////////////////////////////////////Êı¾İ´¦Àí´úÂë/////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////æ•°æ®å¤„ç†ä»£ç /////////////////////////////////////////////////////////////////////////
 
 	//bool Update(sqlite3 *p, const string &sql);
 
 	static Result *Query(sqlite3 *p, const string &sql);
 
+	static bool Execute(const string sql);
 
-	///////////////////////////////////Êı¾İ¿â²Ù×÷´úÂë////////////////////////////////////////////////////////////////////////
+	// å­—ç¬¦ä¸²åˆ†å‰²
+    static void Split(const std::string& s, std::vector<std::string>& v, const std::string& c);
 
+	// å­—ç¬¦ä¸²æ›¿æ¢ s1é‡Œæ›¿æ¢s2ä¸s3
+    static char* Replace(char* s1, char* s2, char* s3 = NULL);
 
-	// ´ò¿ªÄ¿±êÊı¾İ¿âÁ¬½Ó
-	static BOOL OpenDataBase(CString Name, CString Path = _T(""), bool Console = false);
+	///////////////////////////////////æ•°æ®åº“æ“ä½œä»£ç ////////////////////////////////////////////////////////////////////////
 
 
-	// ¹Ø±ÕÄ¿±êÊı¾İ¿âÁ¬½Ó
-	static BOOL CloseDataBase(bool Console = false);
+	// æ‰“å¼€ç›®æ ‡æ•°æ®åº“è¿æ¥ (è‹¥ç›®æ ‡æ•°æ®åº“ä¸å­˜åœ¨åˆ™åˆ›å»ºæ–°çš„æ•°æ®åº“)
+	static bool OpenDataBase(string Path);
 
 
-	// ´´½¨Ò»¸öÄ¿±êÊı¾İ¿â
-	static BOOL CreateDataBase(CString Name, CString Path = _T(""), bool Console = false);
+	// å…³é—­ç›®æ ‡æ•°æ®åº“è¿æ¥
+	static bool CloseDataBase();
 
 
-	// É¾³ıÒ»¸öÄ¿±êÊı¾İ¿â
-	static BOOL DeleteDataBase(CString Name, CString Path = _T(""), bool Console = false);
+	// æ£€æŸ¥ç›®æ ‡æ•°æ®åº“å­˜åœ¨
+	static bool CheckDataBase(string Path);
 
 
-	// ĞŞ¸ÄÄ¿±êÊı¾İ¿âÃû³Æ
-	static BOOL ReNameDataBase(CString OldName, CString OldPath = _T(""), CString NewName = _T(""), CString NewPath = _T(""), bool Console = false);
+	// å»ºç«‹æœ¬åœ°æ•°æ®åº“è¿æ¥ (å‚æ•°: è·¯å¾„, å¯†ç )
+	static bool LocalConnect(string Path, string Password = "");
 
 
-	// ÒÆ¶¯Ò»¸öÄ¿±êÊı¾İ¿â
-	static BOOL ReMoveDataBase(CString OldName, CString OldPath = _T(""), CString NewName = _T(""), CString NewPath = _T(""), bool Console = false);
+	// è¿œç¨‹è¿æ¥ç›®æ ‡æ•°æ®åº“ (æš‚æœªå®ç°ï¼Œæ•¬è¯·æœŸå¾…)
+	static bool RemoteConnect(string Url, string Password = "");
 
 
-	// ¼ì²éÄ¿±êÊı¾İ¿â´æÔÚ
-	static BOOL CheckDataBase(CString Name, CString Path = _T(""), bool Console = false);
+	// åŠ å¯†ç›®æ ‡æ•°æ®åº“æ•°æ® (è‹¥ä¸æ˜¯ç¬¬ä¸€æ¬¡åŠ å¯†åˆ™éœ€è¦æ—§å¯†ç ç”¨äºä¿®æ”¹æ–°å¯†ç ) (å¯å°†å¯†ç è®¾ä¸ºç©º""å–æ¶ˆå¯†ç ä¿æŠ¤)
+	static bool EncryptionDataBase(string Password, string OldPassword = "");
 
 
-	// Í³¼ÆÄ¿±êÊı¾İ¿âÊıÁ¿
-	static BOOL CountDataBase(CString DataBasePath, int &Count, bool Console = false);
+	// è§£å¯†ç›®æ ‡æ•°æ®åº“æ•°æ® 
+	static bool DecryptionDataBase(string Password);
 
 
-	// ±¸·İÄ¿±êÊı¾İ¿âÊı¾İ
-	static BOOL BackupDataBase(CString DataBasePath, CString BackupPath, bool Console = false);
+	///////////////////////////////////æ•°æ®è¡¨æ“ä½œä»£ç ////////////////////////////////////////////////////////////////////////
 
 
-	// »¹Ô­Ä¿±êÊı¾İ¿âÊı¾İ
-	static BOOL RestoreDataBase(CString DataBasePath, CString RestorePath, bool Console = false);
+	// è·å–æ•°æ®åº“ä¸­æ‰€æœ‰è¡¨çš„åç§°
+	static bool GetTableName(string &TableData);
 
 
-	// Ô¶³ÌÁ¬½ÓÄ¿±êÊı¾İ¿â
-	static BOOL RemoteDataBase(CString Name, CString Path, bool Console = false);
+	// è·å–æ•°æ®åº“ä¸­æ‰€æœ‰è¡¨çš„æ•°æ®
+	static bool GetDataTable(string &TableData);
 
 
-	// ¼ÓÃÜÄ¿±êÊı¾İ¿âÊı¾İ
-	static BOOL EncryptionDataBase(CString DataBaseName, CString Password, bool Console = false);
+	// è·å–æ•°æ®åº“ä¸­æ•°æ®è¡¨çš„ä¿¡æ¯
+	static bool GetTableData(string TableName, string &TableData);
 
 
-	// ½âÃÜÄ¿±êÊı¾İ¿âÊı¾İ
-	static BOOL DecryptionDataBase(CString DataBaseName, CString Password, bool Console = false);
+	// è·å¾—æ•°æ®è¡¨ä¸­æ‰€æœ‰åˆ—çš„åç§°
+	static bool GetColName(string TableName, string &ColName);
 
 
-	// ÉÏ´«Ô¶³ÌÄ¿±êÊı¾İ¿â
-	static BOOL UploadDataBase(CString DataBasePath, CString UploadPath, bool Console = false);
+	// è·å¾—æ•°æ®è¡¨ä¸­æ‰€æœ‰åˆ—çš„ç±»å‹
+	static bool GetColType(string TableName, string &ColType);
 
 
-	// ÏÂÔØÔ¶³ÌÄ¿±êÊı¾İ¿â
-	static BOOL DownloadDataBase(CString DataBasePath, CString DownloadPath, bool Console = false);
+	// è·å¾—æ•°æ®è¡¨ä¸­æ‰€æœ‰åˆ—çš„æ•°é‡
+	static bool CountColName(string TableName, int &Count);
 
 
-	///////////////////////////////////Êı¾İ±í²Ù×÷´úÂë////////////////////////////////////////////////////////////////////////
+	// åœ¨ç›®æ ‡æ•°æ®åº“ä¸­åˆ›å»ºæ•°æ®è¡¨
+	static bool CreateDataTable(string TableName, string Params);
 
 
-	// »ñÈ¡Êı¾İ¿âÖĞËùÓĞ±íµÄÃû³Æ
-	static BOOL GetTableName(CString &TableName, bool Console = false);
+	// åœ¨ç›®æ ‡æ•°æ®åº“ä¸­åˆ é™¤æ•°æ®è¡¨
+	static bool DeleteDataTable(string TableName);
 
 
-	// »ñÈ¡Êı¾İ¿âÖĞËùÓĞ±íµÄÊı¾İ
-	static BOOL GetDataTable(CString &DataTable, bool Console = false);
+	// åœ¨ç›®æ ‡æ•°æ®åº“ä¸­ä¿®æ”¹æ•°æ®è¡¨
+	static bool UpdataDataTable(string TableName, int Operation, string Params, string NewParams = "");
 
 
-	// »ñÈ¡Êı¾İ¿âÖĞÊı¾İ±íµÄĞÅÏ¢
-	static BOOL GetTableData(CString TableName, CString &SQL_Data, bool Console = false);
+	// åœ¨ç›®æ ‡æ•°æ®åº“ä¸­æ£€æŸ¥æ•°æ®è¡¨     ( æ£€æŸ¥æ•°æ®è¡¨æ˜¯å¦å­˜åœ¨ )
+	static bool CheckDataTable (string TableName);
 
 
-	// »ñµÃÊı¾İ±íÖĞËùÓĞÁĞµÄÃû³Æ
-	static BOOL GetColName(CString TableName, CString &ColName, bool Console = false);
+	// åœ¨ç›®æ ‡æ•°æ®åº“ä¸­ç»Ÿè®¡æ•°æ®è¡¨     ( ç»Ÿè®¡æ•°æ®è¡¨æ€»å…±æ•°é‡ )
+	static bool CountDataTable (int &Count);
 
 
-	// »ñµÃÊı¾İ±íÖĞËùÓĞÁĞµÄÀàĞÍ
-	static BOOL GetColType(CString TableName, CString &ColType, bool Console = false);
+	// ä»ç›®æ ‡æ•°æ®åº“ä¸­å¯¼å…¥æ•°æ®è¡¨ (æš‚æœªå®ç°ï¼Œæ•¬è¯·æœŸå¾…)
+	static bool ImportDataTable(string TableName, string TargetName);
 
 
-	// ÔÚÄ¿±êÊı¾İ¿âÖĞ´´½¨Êı¾İ±í
-	static BOOL CreateDataTable(CString TableName, CString Params, bool Console = false);
+	// å‘ç›®æ ‡æ•°æ®åº“ä¸­å¯¼å‡ºæ•°æ®è¡¨ (æš‚æœªå®ç°ï¼Œæ•¬è¯·æœŸå¾…)
+	static bool ExportDataTable(string TableName, string TargetName);
 
 
-	// ÔÚÄ¿±êÊı¾İ¿âÖĞÉ¾³ıÊı¾İ±í
-	static BOOL DeleteDataTable(CString TableName, bool Console = false);
+	///////////////////////////////////æ•°æ®é¡¹æ“ä½œä»£ç ////////////////////////////////////////////////////////////////////////
 
 
-	// ÔÚÄ¿±êÊı¾İ¿âÖĞĞŞ¸ÄÊı¾İ±í
-	static BOOL UpdataDataTable(CString TableName, int Operation, CString Params, CString NewParams = _T(""), bool Console = false);
+	// å‘ç›®æ ‡æ•°æ®è¡¨ä¸­æ·»åŠ æ•°æ®é¡¹
+	static bool InsertData(string TableName, string Params);
 
 
-	// ÔÚÄ¿±êÊı¾İ¿âÖĞ¼ì²éÊı¾İ±í     ( ¼ì²éÊı¾İ±íÊÇ·ñ´æÔÚ )
-	static BOOL CheckDataTable (CString TableName, bool Console = false);
+	// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­åˆ é™¤æ•°æ®é¡¹
+	static bool DeleteData(string TableName, string Params);
 
 
-	// ÔÚÄ¿±êÊı¾İ¿âÖĞÍ³¼ÆÊı¾İ±í     ( Í³¼ÆÊı¾İ±í×Ü¹²ÊıÁ¿ )
-	static BOOL CountDataTable (int &Count, bool Console = false);
+	// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­ä¿®æ”¹å•æ•°æ®
+	static bool UpdataData(string TableName, string Column, string NewData, string Params);
 
 
-	// ÏòÄ¿±êÊı¾İ¿âÖĞµ¼ÈëÊı¾İ±í
-	static BOOL ImportDataTable(CString TableName, CString TargetName, bool Console = false);
+	// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­ä¿®æ”¹æ•°æ®é¡¹
+	static bool UpdataData(string TableName, string ColumnParams, string Params);
 
 
-	// ´ÓÄ¿±êÊı¾İ¿âÖĞµ¼³öÊı¾İ±í
-	static BOOL ExportDataTable(CString TableName, CString TargetName, bool Console = false);
+	// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æŸ¥è¯¢æ•°æ®é¡¹
+	static bool SelectData(string TableName, vector<string> &pResult, string Params = "", string Order = "", string Limit = "", int SortMode = MOD_ASC, bool DISTINCT = false, string COUNT = "", string COLUMN = "", string GROUP = "", string HAVING = "");
 
 
-	///////////////////////////////////Êı¾İÏî²Ù×÷´úÂë////////////////////////////////////////////////////////////////////////
+	// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æŸ¥è¯¢åˆ—æ•°æ®
+	static bool SelectData(string TableName, string &pResult, int Col, string Params = "", string Order = "", string Limit = "", int SortMode = MOD_ASC, bool DISTINCT = false, string COUNT = "", string COLUMN = "", string GROUP = "", string HAVING = "");
+	
+	
+	// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æŸ¥è¯¢æ•°æ®å€¼
+	static bool SelectData(string TableName, string &pResult, string Column, string Params = "", string Order = "", string Limit = "", int SortMode = MOD_ASC, bool DISTINCT = false, string COUNT = "", string COLUMN = "", string GROUP = "", string HAVING = "");
 
 
-	// ÏòÄ¿±êÊı¾İ±íÖĞÌí¼ÓÊı¾İÏî
-	static BOOL InsertData(CString TableName, CString Params, bool Console = false);
+	// åœ¨ç›®æ ‡æ•°æ®è¡¨ä¸­æ£€æŸ¥æ•°æ®é¡¹
+	static bool CheckData (string TableName, int Col, string Params = "", string Order = "", string Limit = "", int SortMode = MOD_ASC, bool DISTINCT = false, string COUNT = "", string COLUMN = "", string GROUP = "", string HAVING = "");
 
 
-	// ´ÓÄ¿±êÊı¾İ±íÖĞÉ¾³ıÊı¾İÏî
-	static BOOL DeleteData(CString TableName, CString Params, bool Console = false);
+	// åœ¨ç›®æ ‡æ•°æ®è¡¨ä¸­æ£€æŸ¥æ•°æ®é¡¹
+	static bool CheckData (string TableName, string Column, string Params = "",  string Order = "", string Limit = "", int SortMode = MOD_ASC, bool DISTINCT = false, string COUNT = "", string COLUMN = "", string GROUP = "", string HAVING = "");
 
 
-	// ´ÓÄ¿±êÊı¾İ±íÖĞĞŞ¸Äµ¥Êı¾İ
-	static BOOL UpdataData(CString TableName, CString Column, CString NewData, CString Params, bool Console = false);
+	// ç»Ÿè®¡ç›®æ ‡æ•°æ®è¡¨ä¸­æ•°æ®æ•°é¡¹
+	static bool CountData (string TableName, string Params, int &Count);
 
 
-	// ´ÓÄ¿±êÊı¾İ±íÖĞĞŞ¸ÄÊı¾İÏî
-	static BOOL UpdataData(CString TableName, CString ColumnParams, CString Params, bool Console = false);
+	// é‡ç½®ç›®æ ‡æ•°æ®è¡¨æ•°æ®æ•°ç¼–å· (ClearDataä¸ºfalseåˆ™ä¸æ¸…ç©ºæ•°æ® å¦åˆ™æ¸…ç©ºæ•°æ®)
+	static bool Truncate(string TableName);
 
 
-	// ´ÓÄ¿±êÊı¾İ±íÖĞ²éÑ¯Êı¾İÏî
-	static BOOL SelectData(CString TableName, vector<CString> &pResult, CString Params = _T(""), bool Console = false, CString Order = _T(""), CString Limit = _T(""), int SortMode = MOD_ASC, BOOL DISTINCT = FALSE, CString COUNT = _T(""), CString COLUMN = _T(""), CString GROUP = _T(""), CString HAVING = _T(""));
+	///////////////////////////////////æ•°æ®é¡¹è®¡ç®—ä»£ç ////////////////////////////////////////////////////////////////////////
 
 
-	// ´ÓÄ¿±êÊı¾İ±íÖĞ²éÑ¯Ä³Êı¾İ
-	static BOOL SelectData(CString TableName, CString &pResult, int Col, CString Params = _T(""),bool Console = false, CString Order = _T(""), CString Limit = _T(""), int SortMode = MOD_ASC, BOOL DISTINCT = FALSE, CString COUNT = _T(""), CString COLUMN = _T(""), CString GROUP = _T(""), CString HAVING = _T(""));
+	// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æ±‚æ•°æ®é¡¹å’Œ
+	static bool SumData(string TableName, string Column, string Params, double &SumData);
 
 
-	// ÔÚÄ¿±êÊı¾İ±íÖĞ¼ì²éÊı¾İÏî
-	static BOOL CheckData (CString TableName, int Col, CString Params = _T(""), bool Console = false, CString Order = _T(""), CString Limit = _T(""), int SortMode = MOD_ASC, BOOL DISTINCT = FALSE, CString COUNT = _T(""), CString COLUMN = _T(""), CString GROUP = _T(""), CString HAVING = _T(""));
+	// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æ±‚æ•°æ®é¡¹ç§¯
+	static bool ProductData(string TableName, string Column, string Params, double &ProductData);
 
 
-	// Í³¼ÆÄ¿±êÊı¾İ±íÖĞÊı¾İÊıÏî
-	static BOOL CountNumber(CString TableName, CString Params, int &Count, bool Console = false);
+	// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æ±‚æ•°æ®é¡¹å¹³å‡æ•°
+	static bool AvgData(string TableName, string Column ,string Params, double &AvgData);
 
 
-	// ÏòÄ¿±êÊı¾İ±íÖĞµ¼ÈëÊı¾İÏî
-	static BOOL ImportData (CString TableName, CString TargetTableName, CString Params, bool Console = false);
+	// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æ±‚æ•°æ®é¡¹çš„ä¼—æ•°
+	static bool PluData(string TableName, string Column, string Params, double &PluData);
 
 
-	// ´ÓÄ¿±êÊı¾İ±íÖĞµ¼³öÊı¾İÏî
-	static BOOL ExportData (CString TableName, CString TargetTableName, CString Params, bool Console = false);
+	// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æ±‚æ•°æ®é¡¹ä¸­ä½æ•°
+	static bool MidData(string TableName, string Column, string Params, double &MidData);
 
 
-	// É¾³ıÄ¿±êÊı¾İ±íÖĞĞĞ¾İÊıÏî
-	static BOOL DeleteRowData(CString TableName, int Row, bool Console = false);
+	// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æ±‚æ•°æ®é¡¹æœ€å¤§å€¼
+	static bool MaxData(string TableName, string Column, string Params, double &MaxData);
 
 
-	// É¾³ıÄ¿±êÊı¾İ±íÖĞÁĞ¾İÊıÏî
-	static BOOL DeleteColData(CString TableName, int Col, bool Console = false);
+	// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æ±‚æ•°æ®é¡¹æœ€å°å€¼
+	static bool MinData(string TableName, string Column, string Params, double &MinData);
 
 
-	// É¾³ıÄ¿±êÊı¾İ±íÖĞ³õ¾İÊıÏî
-	static BOOL DeleteMinData(CString TableName, bool Console = false);
-
-
-	// É¾³ıÄ¿±êÊı¾İ±íÖĞ¼ä¾İÊıÏî
-	static BOOL DeleteMidData(CString TableName, bool Console = false);
-
-
-	// É¾³ıÄ¿±êÊı¾İ±íÖĞÄ©¾İÊıÏî
-	static BOOL DeleteMaxData(CString TableName, bool Console = false);
-
-
-	// ĞŞ¸ÄÄ¿±êÊı¾İ±íÖĞĞĞ¾İÊıÏî
-	static BOOL UpdataRowData(CString TableName, int Row, CString UpdataData, bool Console = false);
-
-
-	// ĞŞ¸ÄÄ¿±êÊı¾İ±íÖĞÁĞ¾İÊıÏî
-	static BOOL UpdataColData(CString TableName, int Col, CString UpdataData, bool Console = false);
-
-
-	// ĞŞ¸ÄÄ¿±êÊı¾İ±íÖĞ³õ¾İÊıÏî
-	static BOOL UpdataMinData(CString TableName, CString UpdataData, bool Console = false);
-
-
-	// ĞŞ¸ÄÄ¿±êÊı¾İ±íÖĞ¼ä¾İÊıÏî
-	static BOOL UpdataMidData(CString TableName, CString UpdataData, bool Console = false);
-
-
-	// ĞŞ¸ÄÄ¿±êÊı¾İ±íÖĞÄ©¾İÊıÏî
-	static BOOL UpdataMaxData(CString TableName, CString UpdataData, bool Console = false);
-
-
-	// ¼ìË÷Ä¿±êÊı¾İ±íÖĞĞĞ¾İÊıÏî
-	static BOOL SelectRowData(CString TableName, int Row, CString &RowData, bool Console = false);
-
-
-	// ¼ìË÷Ä¿±êÊı¾İ±íÖĞÁĞ¾İÊıÏî
-	static BOOL SelectColData(CString TableName, int Col, CString &ColData, bool Console = false);
-
-
-	// ¼ìË÷Ä¿±êÊı¾İ±íÖĞ³õ¾İÊıÏî
-	static BOOL SelectMinData(CString TableName, CString &MinData, bool Console = false);
-
-
-	// ĞŞ¸ÄÄ¿±êÊı¾İ±íÖĞ¼ä¾İÊıÏî
-	static BOOL SelectMidData(CString TableName, CString &MidData, bool Console = false);
-
-
-	// ¼ìË÷Ä¿±êÊı¾İ±íÖĞÄ©¾İÊıÏî
-	static BOOL SelectMaxData(CString TableName, CString &MaxData, bool Console = false);
-
-
-	// ÎªÄ¿±êÊı¾İ±íÖĞ¾İÊıÏîÅÅĞò
-	static BOOL SelectSortData(CString TableName, int Sort, CString &SortData, bool Console = false);
-
-
-	// ÖØĞÂÅÅÁĞÊı¾İ±í¾İÊıÏîË³Ğò
-	static BOOL ChangeSortData(CString TableName, int Sort, bool Console = false);
-
-
-	// ´ÓÄ¿±êÊı¾İ±íÖĞÉ¸Ñ¡Êı¾İÏî
-	static BOOL FilterData(CString TableName, CString Params, CString &FilterData, bool Console = false);
-
-
-	// ´ÓÄ¿±êÊı¾İ±íÖĞµÃµ½Ëæ»úÊı¾İÏî
-	static BOOL RanData(CString TableName, CString Params, CString &RanData, bool Console = false);
-
-
-	///////////////////////////////////Êı¾İÏî¼ÆËã´úÂë////////////////////////////////////////////////////////////////////////
-
-
-	// ´ÓÄ¿±êÊı¾İ±íÖĞÇóÊı¾İÏîºÍ
-	static BOOL SumData(CString TableName, CString Column, CString Params, int &SumData, bool Console = false);
-
-
-	// ´ÓÄ¿±êÊı¾İ±íÖĞÇóÊı¾İÏî»ı
-	static BOOL ProductData(CString TableName, CString Column, CString Params, int &ProductData, bool Console = false);
-
-
-	// ´ÓÄ¿±êÊı¾İ±íÖĞÇóÊı¾İÏîÆ½¾ùÊı
-	static BOOL AvgData(CString TableName, CString Column ,CString Params, int &AvgData, bool Console = false);
-
-
-	// ´ÓÄ¿±êÊı¾İ±íÖĞÇóÊı¾İÏîÖĞÎ»Êı
-	static BOOL MidData(CString TableName, CString Column, CString Params, int &MidData, bool Console = false);
-
-
-	// ´ÓÄ¿±êÊı¾İ±íÖĞÇóÊı¾İÏî×î´óÖµ
-	static BOOL MaxData(CString TableName, CString Column, CString Params, int &AbsData, bool Console = false);
-
-
-	// ´ÓÄ¿±êÊı¾İ±íÖĞÇóÊı¾İÏî×îĞ¡Öµ
-	static BOOL MinData(CString TableName, CString Column, CString Params, int &AbsData, bool Console = false);
-
-
-	// ´ÓÄ¿±êÊı¾İ±íÖĞÈ¡Êı¾İÏîËæ»úÊı
-	static BOOL RanData(CString TableName, CString Column, CString Params, int &RanData, bool Console = false);
-
-
-	///////////////////////////////////Êı¾İ±àÂë×ª»»´úÂë////////////////////////////////////////////////////////////////////////
-
-
-	//ACSII×ªUnicode
-	static wstring AcsiiToUnicode( const string  & acsii_string);
-
-	//ACSII×ªUTF8  
-	static string  AcsiiToUtf8(    const string  & acsii_string);
-
-	//Unicode×ªACSII  
-	static string  UnicodeToAcsii( const wstring & unicode_string);
-
-	//Unicode×ªUTF8  
-	static string  UnicodeToUtf8(  const wstring & unicode_string);
-
-	//UTF8×ªACSII 
-	static string  Utf8ToAcsii(    const string  & utf8_string);
-
-	//UTF8×ªUnicode  
-	static wstring Utf8ToUnicode(  const string  & utf8_string);
+	// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­å–æ•°æ®é¡¹éšæœºæ•°
+	static bool RandData(string TableName, string Column, string Params, int &RanData);
 };
 

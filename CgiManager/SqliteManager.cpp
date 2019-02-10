@@ -1,102 +1,79 @@
-#include "stdafx.h"
-#include "SqliteManager.h"
+ï»¿#include "SqliteManager.h"
 
+///////////////////////////////////æ„é€ æŠ˜æ„ä»£ç ///////////////////////////////////
 
-///////////////////////////////////¹¹ÔìÕÛ¹¹´úÂë///////////////////////////////////
-
-// ¾²Ì¬³ÉÔ±³õÊ¼»¯
+// é™æ€æˆå‘˜åˆå§‹åŒ–
 sqlite3 *CSqliteManager::db    = NULL;
 sqlite3_stmt * CSqliteManager::stmt = NULL;
 char * CSqliteManager::errMsg  = NULL;
 char **CSqliteManager::pRes    = NULL;
 int CSqliteManager::nRow = NULL, CSqliteManager::nCol = NULL;
-BOOL CSqliteManager::IsConnect = FALSE;
-bool CSqliteManager::IsConsole = FALSE;
+bool CSqliteManager::IsConnect = false;
 int CSqliteManager::version    = NULL;
-CList <CString, CString&> CSqliteManager::pResult = NULL;
 
 
-// Ä¬ÈÏ¹¹Ôìº¯Êı
-CSqliteManager::CSqliteManager(bool Console)
+// é»˜è®¤æ„é€ å‡½æ•°
+CSqliteManager::CSqliteManager()
 {
-	// ÅĞ¶ÏÊÇ·ñÒÑÍê³É³õÊ¼»¯
-	if(!Init)
-	{
-		// Ä¬ÈÏÁ¬½ÓÊ§°Ü
-		IsConnect = FALSE;
-		IsConsole = Console;
-
-		// ³õÊ¼»¯Íê³É±êÊ¶
-		Init = true;
-	}
+	// é»˜è®¤è¿æ¥å¤±è´¥
+	IsConnect = false;
 }
 
 
-// ´øÊı¾İ¿âÃû³ÆºÍÂ·¾¶²ÎÊıµÄ¹¹Ôìº¯Êı
-CSqliteManager::CSqliteManager(CString Name, CString Path, bool Console)
+// å¸¦æ•°æ®åº“åç§°å’Œè·¯å¾„å‚æ•°çš„æ„é€ å‡½æ•°
+CSqliteManager::CSqliteManager(string Path)
 {
-	// Ä¬ÈÏÁ¬½ÓÊ§°Ü
-	IsConnect = FALSE;
+	// é»˜è®¤è¿æ¥å¤±è´¥
+	IsConnect = false;
 
-	// Ä¬ÈÏ²»ÊÇ¿ØÖÆÌ¨
-	IsConsole = Console;
-
-	// ´ò¿ªÄ¿±êÊı¾İ¿âÁ¬½Ó
-	if (!OpenDataBase(Name, Path, Console))
+	// æ‰“å¼€ç›®æ ‡æ•°æ®åº“è¿æ¥
+	if (!OpenDataBase(Path))
 	{
-		// µ¯³ö´íÎóĞÅÏ¢
-		if(Console)
-			AfxMessageBox(_T("Ä¿±êÊı¾İ¿â¶ÔÏó´´½¨Ê§°Ü!"));
-		else
-			std::cout<<"Ä¿±êÊı¾İ¿â¶ÔÏó´´½¨Ê§°Ü!"<<std::endl;
+		std::cout<<"ç›®æ ‡æ•°æ®åº“å¯¹è±¡åˆ›å»ºå¤±è´¥!"<<std::endl;
 
-		// ·µ»ØÊı¾İ¿â¶ÔÏó´´½¨Ê§°ÜµÄĞÅÏ¢
+		// è¿”å›æ•°æ®åº“å¯¹è±¡åˆ›å»ºå¤±è´¥çš„ä¿¡æ¯
 		return;
 	}
 }
 
 
-// Ä¬ÈÏÕÛ¹¹º¯Êı
+// é»˜è®¤æŠ˜æ„å‡½æ•°
 CSqliteManager::~CSqliteManager()
 {
-	// ÅĞ¶ÏÊÇ·ñÒÑÍê³ÉÏú»Ù
-	if(Init && IsConnect)
+	// åˆ¤æ–­æ˜¯å¦å·²å®Œæˆé”€æ¯
+	if(IsConnect)
 	{
-		// ¹Ø±ÕÊı¾İ¿âÁ¬½Ó
-		CloseDataBase(IsConsole);
-
-		// Ïú»ÙÒÑÍê³É±êÊ¶
-		Init = false;
+		// å…³é—­æ•°æ®åº“è¿æ¥
+		CloseDataBase();
 	}
 }
 
 
-///////////////////////////////////²ÎÊı½âÎö´úÂë///////////////////////////////////
+///////////////////////////////////å‚æ•°è§£æä»£ç ///////////////////////////////////
 
-
-// ½âÎö´«Èë²ÎÊıµÄÊıÁ¿
-int CSqliteManager::FindCharCount(CString csStr, char c)
+// è§£æä¼ å…¥å‚æ•°çš„æ•°é‡
+int CSqliteManager::FindCharCount(string csStr, char c)
 {
-	// ³õÊ¼»¯²ÎÊı¸öÊıÎª0
+	// åˆå§‹åŒ–å‚æ•°ä¸ªæ•°ä¸º0
 	int iCount = 0;
 
-	// Ñ­»·²éÕÒ²ÎÊı
-	for (int i = 0; i<csStr.GetLength(); i++)
+	// å¾ªç¯æŸ¥æ‰¾å‚æ•°
+	for (int i = 0; i < (int)strlen(csStr.c_str()); i++)
 	{
-		// Ñ­»·±éÀú
-		i = csStr.Find(c, i + 1);
+		// å¾ªç¯éå†
+		i = csStr.find(c, i + 1);
 
-		// ²ÎÊı¸öÊı×Ô¼Ó1
+		// å‚æ•°ä¸ªæ•°è‡ªåŠ 1
 		iCount++;
 	}
 
-	// ·µ»Ø²ÎÊı¸öÊı
+	// è¿”å›å‚æ•°ä¸ªæ•°
 	return iCount;
 }
 
 
-// ·Ö¸î×Ö·û´®
-void CSqliteManager::Split(CString source, CString divKey, CStringArray &dest)
+// åˆ†å‰²å­—ç¬¦ä¸²
+/*void CSqliteManager::Split(CString source, CString divKey, CStringArray &dest)
 {
 	dest.RemoveAll();
 	int pos = 0;
@@ -107,14 +84,14 @@ void CSqliteManager::Split(CString source, CString divKey, CStringArray &dest)
 		pos     = source.Find(divKey, (pos +1));
 
 		CString temp(source.Mid(pre_pos , (pos -pre_pos )));
-		temp.Replace(divKey, _T(""));
+		temp.Replace(divKey, "");
 		dest.Add(temp);
 	}
 }
 
 
-//ÓÃÓÚ¼ÆËãÎÄ¼ş¼ĞÄÚµÄÎÄ¼şÊıÁ¿
-int CSqliteManager::CountFile(CString Path)
+//ç”¨äºè®¡ç®—æ–‡ä»¶å¤¹å†…çš„æ–‡ä»¶æ•°é‡
+int CSqliteManager::CountFile(string Path)
 {
 	int count = 0;
 	CFileFind finder;
@@ -133,15 +110,77 @@ int CSqliteManager::CountFile(CString Path)
 		}
 	}
 	return count;
+}*/
+
+/*ä»å­—ç¬¦ä¸²çš„å·¦è¾¹æˆªå–nä¸ªå­—ç¬¦*/  
+
+
+// å­—ç¬¦ä¸²åˆ†å‰²
+void CSqliteManager::Split(const std::string& s, std::vector<std::string>& v, const std::string& c)
+{
+  std::string::size_type pos1, pos2;
+  pos2 = s.find(c);
+  pos1 = 0;
+  while(std::string::npos != pos2)
+  {
+    v.push_back(s.substr(pos1, pos2-pos1));
+ 
+    pos1 = pos2 + c.size();
+    pos2 = s.find(c, pos1);
+  }
+  if(pos1 != s.length())
+    v.push_back(s.substr(pos1));
 }
 
-////////////////////////////////////ÊÂÎï´¦Àí´úÂë//////////////////////////////////
+
+// å­—ç¬¦ä¸²æ›¿æ¢ s1é‡Œæ›¿æ¢s2ä¸s3
+char* CSqliteManager::Replace(char* s1, char* s2, char* s3)
+{
+    char *p,*from,*to,*begin=s1;
+    int c1,c2,c3,c;         //ä¸²é•¿åº¦åŠè®¡æ•°
+    c2=strlen(s2);
+    c3=(s3!=NULL)?strlen(s3):0;
+    if(c2==0)return s1;     //æ³¨æ„è¦é€€å‡º
+    while(true)             //æ›¿æ¢æ‰€æœ‰å‡ºç°çš„ä¸²
+    {
+        c1=strlen(begin);
+        p=strstr(begin,s2); //å‡ºç°ä½ç½®
+        if(p==NULL)         //æ²¡æ‰¾åˆ°
+            return s1;
+        if(c2>c3)           //ä¸²å¾€å‰ç§»
+        {
+            from=p+c2;
+            to=p+c3;
+            c=c1-c2+begin-p+1;
+            while(c--)
+                *to++=*from++;
+        }
+        else if(c2<c3)      //ä¸²å¾€åç§»
+        {
+            from=begin+c1;
+            to=from-c2+c3;
+            c=from-p-c2+1;
+            while(c--)
+                *to--=*from--;
+        }
+        if(c3)              //å®Œæˆæ›¿æ¢
+        {
+            from=s3,to=p,c=c3;
+            while(c--)
+                *to++=*from++;
+        }
+        begin=p+c3;         //æ–°çš„æŸ¥æ‰¾ä½ç½®
+    }
+}
+
+
+////////////////////////////////////äº‹ç‰©å¤„ç†ä»£ç //////////////////////////////////
 
 bool CSqliteManager::transaction(sqlite3 *p)
 {
 	bool result = true;
 	char *zErrorMsg = NULL;
-	int ret = sqlite3_exec(p, "begin transaction", 0, 0, &zErrorMsg); // ¿ªÊ¼Ò»¸öÊÂÎñ  
+	int ret = sqlite3_exec(p, "begin transaction", 0, 0, &zErrorMsg); // å¼€å§‹ä¸€ä¸ªäº‹åŠ¡  
 	if (ret != SQLITE_OK)
 	{
 		//LOGI("start transaction failed:%s", zErrorMsg);
@@ -156,7 +195,7 @@ bool CSqliteManager::commitTransaction(sqlite3 *p)
 {
 	bool result = true;
 	char *zErrorMsg = NULL;
-	int ret = sqlite3_exec(p, "commit transaction", 0, 0, &zErrorMsg); // Ìá½»ÊÂÎñ  
+	int ret = sqlite3_exec(p, "commit transaction", 0, 0, &zErrorMsg); // æäº¤äº‹åŠ¡  
 	if (ret != SQLITE_OK)
 	{
 		//LOGI("commit transaction failed:%s", zErrorMsg);
@@ -171,7 +210,7 @@ bool CSqliteManager::rollbackTransaction(sqlite3 *p)
 {
 	bool result = true;
 	char *zErrorMsg = NULL;
-	int     ret = sqlite3_exec(p, "rollback transaction", 0, 0, &zErrorMsg);
+	int  ret = sqlite3_exec(p, "rollback transaction", 0, 0, &zErrorMsg);
 	if (ret != SQLITE_OK)
 	{
 		//LOGI("rollback transaction failed:%s", zErrorMsg);
@@ -181,9 +220,9 @@ bool CSqliteManager::rollbackTransaction(sqlite3 *p)
 	return result;
 }
 
-////////////////////////////////////Êı¾İ´¦Àí´úÂë///////////////////////////////////
+////////////////////////////////////æ•°æ®å¤„ç†ä»£ç ///////////////////////////////////
 
-Result *CSqliteManager::Query(sqlite3 *p, const string &sql)
+Result* CSqliteManager::Query(sqlite3 *p, const string &sql)
 {
 	Result *pRe = NULL;
 	char *errmsg = NULL;
@@ -191,7 +230,7 @@ Result *CSqliteManager::Query(sqlite3 *p, const string &sql)
 	int nRow = 0;
 	int nColumn = 0;
 
-	//¿ªÊ¼²éÑ¯Êı¾İ¿â
+	//å¼€å§‹æŸ¥è¯¢æ•°æ®åº“
 	int result = sqlite3_get_table(p, sql.c_str(), &dbResult, &nRow, &nColumn, &errmsg);
 	if (result == SQLITE_OK)
 	{
@@ -202,1800 +241,1252 @@ Result *CSqliteManager::Query(sqlite3 *p, const string &sql)
 		//LOGI("[sqlite] SqliteBaseV Query error:dbName=%s,msg=%s sql:%s", dbName.c_str(), errmsg, sql.c_str());
 	}
 
-	// ²»ÂÛÊı¾İ¿â²éÑ¯ÊÇ·ñ³É¹¦£¬¶¼ÊÍ·Å char** ²éÑ¯½á¹û
-	//sqlite3_free_table(dbResult);
+	// ä¸è®ºæ•°æ®åº“æŸ¥è¯¢æ˜¯å¦æˆåŠŸï¼Œéƒ½é‡Šæ”¾ char** æŸ¥è¯¢ç»“æœ
+	sqlite3_free_table(dbResult);
 
-	//ÊÍ·ÅÄÚ´æ
+	//é‡Šæ”¾å†…å­˜
 	sqlite3_free(errmsg);
+
+	// è¿”å›ç»“æœ
 	return pRe;
 }
 
 
-///////////////////////////////////Êı¾İ¿â²Ù×÷´úÂë//////////////////////////////////
-
-
-// ´ò¿ªÄ¿±êÊı¾İ¿âÁ¬½Ó
-BOOL CSqliteManager::OpenDataBase(CString Name, CString Path, bool Console)
+bool CSqliteManager::Execute(const string sql)
 {
-	// Êı¾İ¿â¶ÔÏóÄ¬ÈÏÎª¿Õ
-	db = NULL;
-
-	// ÈôÊı¾İ¿âÒÑÁ¬½Ó³É¹¦
-	if (IsConnect)
-	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("¸ÃÊı¾İ¿âÒÑÁ¬½Ó£¬²»ĞèÒªÔÙ´ÎÁ¬½Ó!"));
-		else
-			std::cout<<"¸ÃÊı¾İ¿âÒÑÁ¬½Ó£¬²»ĞèÒªÔÙ´ÎÁ¬½Ó!"<<std::endl;
-
-		// ·µ»ØÁ¬½ÓÊ§°ÜĞÅÏ¢
-		return FALSE;
-	}
-	else
-	{
-		// ³õÊ¼»¯Ä¿±êÊı¾İ¿â±äÁ¿
-		CString DatabasePath = Path;
-
-		// ÈôÄ¿±êÂ·¾¶²»Îª¿Õ
-		if (!Path.IsEmpty() || atoi((CStringA)Path) != NULL)
-		{
-			// Èç¹ûÄ¿±êÂ·¾¶²»°üº¬ \ ¾Í¼ÓÉÏ												   
-			if (DatabasePath.Right(1) != _T("\\"))
-				DatabasePath += _T("\\");
-
-			// ¸³ÓèÄ¿±êÊı¾İ¿âµÄÖµÎªÄ¿±êÂ·¾¶¼ÓÉÏÄ¿±êÎÄ¼şÃû
-			DatabasePath += Name;
-		}
-		else
-		{
-			// ¸³ÓèÄ¿±êÊı¾İ¿âµÄÖµÎªµ±Ç°Â·¾¶¼ÓÉÏÄ¿±êÎÄ¼şÃû
-			DatabasePath = _T("./") + Name;
-		}
-		
-
-		// ²éÕÒÄ¿±êÊı¾İ¿âÊÇ·ñ´æÔÚ
-		CFileFind Finder;
-		BOOL Status = Finder.FindFile(DatabasePath);
-
-		// Èô²»´æÔÚÄ¿±êÊı¾İ¿âÔò³¢ÊÔ´´½¨²¢Á¬½ÓÄ¿±êÊı¾İ¿â
-		if (!Status)
-		{
-			// ÈôÄ¿±êÂ·¾¶²»Îª¿Õ
-			if (!Path.IsEmpty())
-			{
-				// ¼ì²éÄ¿±êÂ·¾¶ÊÇ·ñ´æÔÚ
-				DWORD DataPath = GetFileAttributes(Path);
-
-				// ÈôÄ¿±êÂ·¾¶²»´æÔÚ
-				if (DataPath == 0xFFFFFFFF)
-				{
-					// ´´½¨Ä¿±êÂ·¾¶
-					CreateDirectory(Path, NULL);
-				}
-			}
-
-			// ³¢ÊÔÁ¬½ÓÄ¿±êÊı¾İ¿â
-			try
-			{
-				// ´´½¨²¢´ò¿ªÄ¿±êÊı¾İ¿â
-				if (sqlite3_open((CStringA)DatabasePath, &db) != SQLITE_OK) // ÈôÎŞ·¨Á¬½ÓÊı¾İ¿â
-				{
-					// µ¯³ö´íÎóĞÅÏ¢
-					if(!Console)
-						::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-					else
-						std::cout<<sqlite3_errmsg(db)<<std::endl;
-
-					// ¹Ø±ÕÊı¾İ¿âÁ¬½Ó
-					CloseDataBase();
-
-					// ·µ»ØÊı¾İ¿âÁ¬½ÓÊ§°ÜµÄĞÅÏ¢
-					return FALSE;
-				}
-
-				// ÈôÊı¾İ¿â³É¹¦Á¬½Ó
-				else
-				{
-					// ±êÊ¾Êı¾İ¿âÒÑÁ¬½Ó
-					IsConnect = TRUE;
-
-					// ·µ»ØÊı¾İ¿âÁ¬½Ó³É¹¦µÄĞÅÏ¢
-					return TRUE;
-				}
-			}
-			// ²¶×½´íÎó
-			catch (...)
-			{
-				// µ¯³ö´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, _T("ÎŞ·¨Á¬½Óµ½Êı¾İ¿â!"), NULL, NULL);
-				else
-					std::cout<<"ÎŞ·¨Á¬½Óµ½Êı¾İ¿â!"<<std::endl;
-
-				// ·µ»ØÊı¾İ¿âÁ¬½ÓÊ§°ÜµÄĞÅÏ¢
-				return FALSE;
-			}
-		}
-		// Èô´æÔÚÄ¿±êÊı¾İ¿âÔò³¢ÊÔÁ¬½ÓÄ¿±êÊı¾İ¿â
-		else
-		{
-			// ³¢ÊÔÁ¬½ÓÊı¾İ¿â
-			try
-			{
-				// Á¬½ÓÄ¿±êÊı¾İ¿â
-				if (sqlite3_open((CStringA)DatabasePath, &db) != SQLITE_OK) // ÈôÎŞ·¨Á¬½ÓÊı¾İ¿â
-				{
-					// µ¯³ö´íÎóĞÅÏ¢
-					if(!Console)
-						::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-					else
-						std::cout<<sqlite3_errmsg(db)<<std::endl;
-
-					// ¹Ø±ÕÊı¾İ¿âÁ¬½Ó
-					CloseDataBase();
-
-					// ·µ»ØÊı¾İ¿âÁ¬½ÓÊ§°ÜµÄĞÅÏ¢
-					return FALSE;
-				}
-
-				// ÈôÊı¾İ¿â³É¹¦Á¬½Ó
-				else
-				{
-					// ±êÊ¾Êı¾İ¿âÒÑÁ¬½Ó
-					IsConnect = TRUE;
-
-					// ·µ»ØÊı¾İ¿âÁ¬½Ó³É¹¦µÄĞÅÏ¢
-					return TRUE;
-				}
-			}
-			// ²¶×½´íÎó
-			catch (...)
-			{
-				// µ¯³ö´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, _T("ÎŞ·¨Á¬½Óµ½Êı¾İ¿â!"), NULL, NULL);
-				else
-					std::cout<<"ÎŞ·¨Á¬½Óµ½Êı¾İ¿â!"<<std::endl;
-
-				// ·µ»ØÊı¾İ¿âÁ¬½ÓÊ§°ÜµÄĞÅÏ¢
-				return FALSE;
-			}
-		}
-	}
-
-	// Ä¬ÈÏ·µ»ØÊı¾İ¿âÁ¬½ÓÊ§°ÜµÄĞÅÏ¢
-	return FALSE;
-}
-
-
-// ¹Ø±ÕÄ¿±êÊı¾İ¿âÁ¬½Ó
-BOOL CSqliteManager::CloseDataBase(bool Console)
-{
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
 	if (!IsConnect)
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("¸ÃÊı¾İ¿âÒÑ¹Ø±Õ£¬²»ĞèÒªÔÙ´Î¹Ø±Õ!"));
-		else
-			std::cout<<"¸ÃÊı¾İ¿âÒÑ¹Ø±Õ£¬²»ĞèÒªÔÙ´Î¹Ø±Õ!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
 
-		// ·µ»Ø¹Ø±ÕÊ§°ÜĞÅÏ¢
-		return FALSE;
+		// è¿”å›åˆ›å»ºå¤±è´¥ä¿¡æ¯
+		return false;
 	}
 	else
 	{
-		// ³¢ÊÔ¹Ø±ÕÊı¾İ¿âÁ¬½Ó
+	    // å°è¯•æ‰§è¡Œæ“ä½œ
 		try
 		{
-			// Èô¹Ø±ÕÊı¾İ¿âÊ§°Ü
+			//æ•°æ®åº“å¯åŠ¨ä¸€ä¸ªäº‹ç‰©
+			if (!transaction(db))
+			{
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<"æ— æ³•å¯åŠ¨äº‹åŠ¡å¤„ç†!"<<std::endl;
+				return false;
+			}
+
+			// è‹¥æ“ä½œæ‰§è¡Œå¤±è´¥
+			if (sqlite3_exec(db, sql.c_str(), NULL, NULL, NULL) != SQLITE_OK)
+			{
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(db)<<std::endl;
+
+				// è¿”å›å¤±è´¥
+				return false;
+			}
+
+			//æäº¤äº‹åŠ¡
+			if (commitTransaction(db) == false)
+			{
+				// å›æ»šäº‹åŠ¡
+				rollbackTransaction(db);
+
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<"Sqlæ‰§è¡Œå¤±è´¥: "<<sqlite3_errmsg(db)<<std::endl;
+
+				// è¿”å›æ‰§è¡Œå¤±è´¥
+				return false;
+			}
+
+			// è¿”å›æ‰§è¡ŒæˆåŠŸ
+			else
+				return true;
+		}
+		catch (...)
+		{
+			// æç¤ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"Sqlæ‰§è¡Œå¤±è´¥!"<<std::endl;
+
+			// è¿”å›æ‰§è¡Œå¤±è´¥
+			return false;
+		}
+	}
+
+	// é»˜è®¤è¿”å›æ‰§è¡Œå¤±è´¥
+	return false;
+}
+
+///////////////////////////////////æ•°æ®åº“æ“ä½œä»£ç //////////////////////////////////
+
+
+// æ‰“å¼€ç›®æ ‡æ•°æ®åº“è¿æ¥
+bool CSqliteManager::OpenDataBase(string Path)
+{
+	// æ•°æ®åº“å¯¹è±¡é»˜è®¤ä¸ºç©º
+	db = NULL;
+
+	// è‹¥æ•°æ®åº“å·²è¿æ¥æˆåŠŸ
+	if (IsConnect)
+	{
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"è¯¥æ•°æ®åº“å·²è¿æ¥ï¼Œä¸éœ€è¦å†æ¬¡è¿æ¥!"<<std::endl;
+
+		// è¿”å›è¿æ¥å¤±è´¥ä¿¡æ¯
+		return false;
+	}
+	else
+	{
+		// å°è¯•è¿æ¥ç›®æ ‡æ•°æ®åº“
+		try
+		{
+			// åˆ›å»ºå¹¶æ‰“å¼€ç›®æ ‡æ•°æ®åº“
+			if (sqlite3_open(Path.c_str(), &db) != SQLITE_OK) // è‹¥æ— æ³•è¿æ¥æ•°æ®åº“
+			{
+				// å¼¹å‡ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(db)<<std::endl;
+
+				// å…³é—­æ•°æ®åº“è¿æ¥
+				CloseDataBase();
+
+				// è¿”å›æ•°æ®åº“è¿æ¥å¤±è´¥çš„ä¿¡æ¯
+				return false;
+			}
+
+			// è‹¥æ•°æ®åº“æˆåŠŸè¿æ¥
+			else
+			{
+				// æ ‡ç¤ºæ•°æ®åº“å·²è¿æ¥
+				IsConnect = true;
+
+				// è¿”å›æ•°æ®åº“è¿æ¥æˆåŠŸçš„ä¿¡æ¯
+				return true;
+			}
+		}
+		// æ•æ‰é”™è¯¯
+		catch (...)
+		{
+			// å¼¹å‡ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"æ— æ³•è¿æ¥åˆ°æ•°æ®åº“!"<<std::endl;
+
+			// è¿”å›æ•°æ®åº“è¿æ¥å¤±è´¥çš„ä¿¡æ¯
+			return false;
+		}
+	}
+
+	// é»˜è®¤è¿”å›æ•°æ®åº“è¿æ¥å¤±è´¥çš„ä¿¡æ¯
+	return false;
+}
+
+
+// å…³é—­ç›®æ ‡æ•°æ®åº“è¿æ¥
+bool CSqliteManager::CloseDataBase()
+{
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
+	if (!IsConnect)
+	{
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"è¯¥æ•°æ®åº“å·²å…³é—­ï¼Œä¸éœ€è¦å†æ¬¡å…³é—­!"<<std::endl;
+
+		// è¿”å›å…³é—­å¤±è´¥ä¿¡æ¯
+		return false;
+	}
+	else
+	{
+		// å°è¯•å…³é—­æ•°æ®åº“è¿æ¥
+		try
+		{
+			// è‹¥å…³é—­æ•°æ®åº“å¤±è´¥
 			if (sqlite3_close(db) != SQLITE_OK)
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-				else
-					std::cout<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»Ø¹Ø±ÕÊ§°ÜĞÅÏ¢
-				return FALSE;
+				// è¿”å›å…³é—­å¤±è´¥ä¿¡æ¯
+				return false;
 			}
 			else
 			{
-				// ±êÊ¾Êı¾İ¿âÒÑ¶Ï¿ªÁ¬½Ó
-				IsConnect = FALSE;
+				// æ ‡ç¤ºæ•°æ®åº“å·²æ–­å¼€è¿æ¥
+				IsConnect = false;
 
-				// Êı¾İ¿â¶ÔÏóÖØÖÃÎª¿Õ
+				// æ•°æ®åº“å¯¹è±¡é‡ç½®ä¸ºç©º
 				db = NULL;
 
-				// ·µ»Ø¹Ø±Õ³É¹¦ĞÅÏ¢
-				return TRUE;
+				// è¿”å›å…³é—­æˆåŠŸä¿¡æ¯
+				return true;
 			}
 		}
 		catch (...)
 		{
-			// ÌáÊ¾´íÎóĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("Êı¾İ¿â¹Ø±ÕÊ§°Ü!"));
-			else
-				std::cout<<"Êı¾İ¿â¹Ø±ÕÊ§°Ü!"<<std::endl;
+			// æç¤ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"æ•°æ®åº“å…³é—­å¤±è´¥!"<<std::endl;
 
 
-			// ·µ»Ø¹Ø±ÕÊ§°ÜĞÅÏ¢
-			return FALSE;
+			// è¿”å›å…³é—­å¤±è´¥ä¿¡æ¯
+			return false;
 		}
 	}
 
-	// Ä¬ÈÏ·µ»Ø¹Ø±ÕÊ§°ÜĞÅÏ¢
-	return FALSE;
+	// é»˜è®¤è¿”å›å…³é—­å¤±è´¥ä¿¡æ¯
+	return false;
 }
 
 
-// ´´½¨Ò»¸öÄ¿±êÊı¾İ¿â
-BOOL CSqliteManager::CreateDataBase(CString Name, CString Path, bool Console)
+// æ£€æŸ¥ç›®æ ‡æ•°æ®åº“å­˜åœ¨
+bool CSqliteManager::CheckDataBase(string Path)
 {
-	// ³õÊ¼»¯Ä¿±êÊı¾İ¿â±äÁ¿
-	CString DatabasePath = Path;
-
-	// ÈôÄ¿±êÂ·¾¶²»Îª¿Õ
-	if (!Path.IsEmpty() || atoi((CStringA)Path) != NULL)
-	{
-		// Èç¹ûÄ¿±êÂ·¾¶²»°üº¬ \ ¾Í¼ÓÉÏ												   
-		if (DatabasePath.Right(1) != _T("\\"))
-			DatabasePath += _T("\\");
-
-		// ¸³ÓèÄ¿±êÊı¾İ¿âµÄÖµÎªÄ¿±êÂ·¾¶¼ÓÉÏÄ¿±êÎÄ¼şÃû
-		DatabasePath += Name;
-	}
-	else
-	{
-		// ¸³ÓèÄ¿±êÊı¾İ¿âµÄÖµÎªµ±Ç°Â·¾¶¼ÓÉÏÄ¿±êÎÄ¼şÃû
-		DatabasePath = _T("./") + Name;
-	}
-
-	// ²éÕÒÄ¿±êÊı¾İ¿âÊÇ·ñ´æÔÚ
-	CFileFind Finder;
-	BOOL Status = Finder.FindFile(DatabasePath);
-
-	// Èô²»´æÔÚÄ¿±êÊı¾İ¿âÔò³¢ÊÔ´´½¨²¢Á¬½ÓÄ¿±êÊı¾İ¿â
-	if (!Status)
-	{
-		// ÈôÄ¿±êÂ·¾¶²»Îª¿Õ
-		if (!Path.IsEmpty())
-		{
-			// ¼ì²éÄ¿±êÂ·¾¶ÊÇ·ñ´æÔÚ
-			DWORD DataPath = GetFileAttributes(Path);
-
-			// ÈôÄ¿±êÂ·¾¶²»´æÔÚ
-			if (DataPath == 0xFFFFFFFF)
-			{
-				// ´´½¨Ä¿±êÂ·¾¶
-				CreateDirectory(Path, NULL);
-			}
-		}
-
-		// ³¢ÊÔ´´½¨Ä¿±êÊı¾İ¿â
-		try
-		{
-			// Êı¾İ¿â¶ÔÏó
-			sqlite3 *Create_db;
-
-			// ´´½¨²¢´ò¿ªÄ¿±êÊı¾İ¿â
-			if (sqlite3_open((CStringA)DatabasePath, &Create_db) != SQLITE_OK) // ÈôÎŞ·¨Á¬½ÓÊı¾İ¿â
-			{
-				// µ¯³ö´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, (CString)sqlite3_errmsg(Create_db), NULL, NULL);
-				else
-					std::cout<<sqlite3_errmsg(Create_db)<<std::endl;
-
-				// Èô¹Ø±ÕÊı¾İ¿âÊ§°Ü
-				if (sqlite3_close(Create_db) != SQLITE_OK)
-				{
-					// ÌáÊ¾´íÎóĞÅÏ¢
-					if(!Console)
-						::MessageBox(NULL, (CString)sqlite3_errmsg(Create_db), NULL, NULL);
-					else
-						std::cout<<sqlite3_errmsg(Create_db)<<std::endl;
-
-					// ·µ»Ø¹Ø±ÕÊ§°ÜĞÅÏ¢
-					return FALSE;
-				}
-
-				// ·µ»ØÊı¾İ¿â´´½¨Ê§°ÜµÄĞÅÏ¢
-				return FALSE;
-			}
-
-			// ÈôÊı¾İ¿â³É¹¦´´½¨
-			else
-			{
-				// Èô¹Ø±ÕÊı¾İ¿âÊ§°Ü
-				if (sqlite3_close(Create_db) != SQLITE_OK)
-				{
-					// ÌáÊ¾´íÎóĞÅÏ¢
-					if(!Console)
-						::MessageBox(NULL, (CString)sqlite3_errmsg(Create_db), NULL, NULL);
-					else
-						std::cout<<sqlite3_errmsg(Create_db)<<std::endl;
-
-					// ·µ»Ø¹Ø±ÕÊ§°ÜĞÅÏ¢
-					return FALSE;
-				}
-
-				// ·µ»ØÊı¾İ¿â´´½¨³É¹¦µÄĞÅÏ¢
-				return TRUE;
-			}
-		}
-		// ²¶×½´íÎó
-		catch (...)
-		{
-			// µ¯³ö´íÎóĞÅÏ¢
-			if(!Console)
-				::MessageBox(NULL, _T("ÎŞ·¨´´½¨Ä¿±êÊı¾İ¿â!"), NULL, NULL);
-			else
-				std::cout<<"ÎŞ·¨´´½¨Ä¿±êÊı¾İ¿â!"<<std::endl;
-
-			// ·µ»ØÊı¾İ¿â´´½¨Ê§°ÜµÄĞÅÏ¢
-			return FALSE;
-		}
-	}
-	else
-	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("ÒÑ´æÔÚÄ¿±êÊı¾İ¿â,±¾´Î´´½¨²Ù×÷Ê§°Ü!"));
-		else
-			std::cout<<"ÒÑ´æÔÚÄ¿±êÊı¾İ¿â,±¾´Î´´½¨²Ù×÷Ê§°Ü!"<<std::endl;
-
-		// ·µ»ØÊı¾İ¿â´´½¨Ê§°ÜµÄĞÅÏ¢
-		return FALSE;
-	}
-	
-	// Ä¬ÈÏ·µ»ØÊı¾İ¿â´´½¨Ê§°ÜµÄĞÅÏ¢
-	return FALSE;
-}
-
-
-// É¾³ıÒ»¸öÄ¿±êÊı¾İ¿â
-BOOL CSqliteManager::DeleteDataBase(CString Name, CString Path, bool Console)
-{
-	// ³õÊ¼»¯Ä¿±êÊı¾İ¿â±äÁ¿
-	CString DatabasePath = Path;
-
-	// ÈôÄ¿±êÂ·¾¶²»Îª¿Õ
-	if (!Path.IsEmpty() || atoi((CStringA)Path) != NULL)
-	{
-		// Èç¹ûÄ¿±êÂ·¾¶²»°üº¬ \ ¾Í¼ÓÉÏ												   
-		if (DatabasePath.Right(1) != _T("\\"))
-			DatabasePath += _T("\\");
-
-		// ¸³ÓèÄ¿±êÊı¾İ¿âµÄÖµÎªÄ¿±êÂ·¾¶¼ÓÉÏÄ¿±êÎÄ¼şÃû
-		DatabasePath += Name;
-	}
-	else
-	{
-		// ¸³ÓèÄ¿±êÊı¾İ¿âµÄÖµÎªµ±Ç°Â·¾¶¼ÓÉÏÄ¿±êÎÄ¼şÃû
-		DatabasePath = _T("./") + Name;
-	}
-
-	// ²éÕÒÄ¿±êÊı¾İ¿âÊÇ·ñ´æÔÚ
-	CFileFind Finder;
-	BOOL Status = Finder.FindFile(DatabasePath);
-
-	// Èô²»´æÔÚÄ¿±êÊı¾İ¿âÔòÌáÊ¾´íÎóĞÅÏ¢
-	if (!Status)
-	{
-		// µ¯³ö´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("²»´æÔÚÄ¿±êÊı¾İ¿â,±¾´ÎÉ¾³ı²Ù×÷Ê§°Ü!"));
-		else
-			std::cout<<"²»´æÔÚÄ¿±êÊı¾İ¿â,±¾´ÎÉ¾³ı²Ù×÷Ê§°Ü!"<<std::endl;
-
-		// ·µ»ØÉ¾³ıÊ§°Ü
-		return FALSE;
-	}
-	else
-	{
-		// ³¢ÊÔÉ¾³ıÊı¾İ¿â
-		try
-		{
-			if (DeleteFile(DatabasePath))
-			{
-				// ·µ»ØÉ¾³ı³É¹¦
-				return TRUE;
-			}
-			else
-			{
-				// µ¯³ö´íÎóĞÅÏ¢
-				if(!Console)
-					AfxMessageBox(_T("³¢ÊÔÉ¾³ıÄ¿±êÊı¾İ¿âÊ§°Ü!"));
-				else
-					std::cout<<"³¢ÊÔÉ¾³ıÄ¿±êÊı¾İ¿âÊ§°Ü!"<<std::endl;
-
-				// ·µ»ØÉ¾³ıÊ§°Ü
-				return FALSE;
-			}
-		}
-		catch (...)
-		{
-			// µ¯³ö´íÎóĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("³¢ÊÔÉ¾³ıÄ¿±êÊı¾İ¿âÊ§°Ü!"));
-			else
-				std::cout<<"³¢ÊÔÉ¾³ıÄ¿±êÊı¾İ¿âÊ§°Ü!"<<std::endl;
-
-			// ·µ»ØÉ¾³ıÊ§°Ü
-			return FALSE;
-		}
-	}
-
-	// Ä¬ÈÏ·µ»ØÉ¾³ıÊ§°Ü
-	return FALSE;
-}
-
-
-// ĞŞ¸ÄÄ¿±êÊı¾İ¿âÃû³Æ
-BOOL CSqliteManager::ReNameDataBase(CString OldName, CString OldPath, CString NewName, CString NewPath, bool Console)
-{
-	// ³õÊ¼»¯Ä¿±êÊı¾İ¿â±äÁ¿
-	CString OldDatabasePath = OldPath, NewDatabasePath = NewPath;
-
-	// Èô¾ÉÄ¿±êÂ·¾¶²»Îª¿Õ
-	if (!OldPath.IsEmpty() || atoi((CStringA)OldPath) != NULL)
-	{
-		// Èç¹ûÄ¿±êÂ·¾¶²»°üº¬ \ ¾Í¼ÓÉÏ												   
-		if (OldDatabasePath.Right(1) != _T("\\"))
-			OldDatabasePath += _T("\\");
-
-		// ¸³ÓèÄ¿±êÊı¾İ¿âµÄÖµÎªÄ¿±êÂ·¾¶¼ÓÉÏÄ¿±êÎÄ¼şÃû
-		OldDatabasePath += OldName;
-	}
-	else
-	{
-		// ¸³ÓèÄ¿±êÊı¾İ¿âµÄÖµÎªµ±Ç°Â·¾¶¼ÓÉÏÄ¿±êÎÄ¼şÃû
-		OldDatabasePath = _T("./") + OldName;
-	}
-
-	// ÈôĞÂÄ¿±êÂ·¾¶²»Îª¿Õ
-	if (!NewPath.IsEmpty() || atoi((CStringA)NewPath) != NULL)
-	{
-		// Èç¹ûÄ¿±êÂ·¾¶²»°üº¬ \ ¾Í¼ÓÉÏ												   
-		if (NewDatabasePath.Right(1) != _T("\\"))
-			NewDatabasePath += _T("\\");
-
-		// ¸³ÓèÄ¿±êÊı¾İ¿âµÄÖµÎªÄ¿±êÂ·¾¶¼ÓÉÏÄ¿±êÎÄ¼şÃû
-		NewDatabasePath += NewName;
-	}
-	else
-	{
-		// ¸³ÓèÄ¿±êÊı¾İ¿âµÄÖµÎªµ±Ç°Â·¾¶¼ÓÉÏÄ¿±êÎÄ¼şÃû
-		NewDatabasePath = _T("./") + NewName;
-	}
-
-
-	// ²éÕÒ¾ÉÄ¿±êÊı¾İ¿âÊÇ·ñ´æÔÚ
-	CFileFind Finder;
-	BOOL Status = Finder.FindFile(OldDatabasePath);
-
-	// Èô²»´æÔÚ¾ÉÄ¿±êÊı¾İ¿âÔòÌáÊ¾´íÎóĞÅÏ¢
-	if (!Status)
-	{
-		// µ¯³ö´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("²»´æÔÚ¾ÉÄ¿±êÊı¾İ¿â,±¾´ÎĞŞ¸Ä²Ù×÷Ê§°Ü!"));
-		else
-			std::cout<<"²»´æÔÚ¾ÉÄ¿±êÊı¾İ¿â,±¾´ÎĞŞ¸Ä²Ù×÷Ê§°Ü!"<<std::endl;
-
-		// ·µ»ØĞŞ¸ÄÊ§°Ü
-		return FALSE;
-	}
-	else
-	{
-		// ³¢ÊÔĞŞ¸ÄÊı¾İ¿â
-		try
-		{
-			// ÈôĞÂÄ¿±êÂ·¾¶²»Îª¿Õ
-			if (!NewPath.IsEmpty())
-			{
-				// ¼ì²éĞÂÄ¿±êÂ·¾¶ÊÇ·ñ´æÔÚ
-				DWORD DataPath = GetFileAttributes(NewPath);
-
-				// ÈôĞÂÄ¿±êÂ·¾¶²»´æÔÚ
-				if (DataPath == 0xFFFFFFFF)
-				{
-					// ´´½¨ĞÂÄ¿±êÂ·¾¶
-					CreateDirectory(NewPath, NULL);
-				}
-			}
-			else
-			{
-				// µ¯³ö´íÎóĞÅÏ¢
-				if(!Console)
-					AfxMessageBox(_T("ĞÂÄ¿±êÊı¾İ¿â²»ÄÜÎª¿Õ,ÒÆ¶¯Ä¿±êÊı¾İ¿âÊ§°Ü!"));
-				else
-					std::cout<<"ĞÂÄ¿±êÊı¾İ¿â²»ÄÜÎª¿Õ,ÒÆ¶¯Ä¿±êÊı¾İ¿âÊ§°Ü!"<<std::endl;
-
-				// ·µ»ØÒÆ¶¯Ê§°Ü
-				return FALSE;
-			}
-
-			if (MoveFileEx(OldDatabasePath, NewDatabasePath, MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING))
-			{
-				// ·µ»ØĞŞ¸Ä³É¹¦
-				return TRUE;
-			}
-			else
-			{
-				// µ¯³ö´íÎóĞÅÏ¢
-				if(!Console)
-					AfxMessageBox(_T("ĞŞ¸ÄÄ¿±êÊı¾İ¿âÊ§°Ü!"));
-				else
-					std::cout<<"ĞŞ¸ÄÄ¿±êÊı¾İ¿âÊ§°Ü!"<<std::endl;
-
-				// ·µ»ØĞŞ¸ÄÊ§°Ü
-				return FALSE;
-			}
-		}
-		catch (...)
-		{
-			// µ¯³ö´íÎóĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("ĞŞ¸ÄÄ¿±êÊı¾İ¿âÊ§°Ü!"));
-			else
-				std::cout<<"ĞŞ¸ÄÄ¿±êÊı¾İ¿âÊ§°Ü!"<<std::endl;
-
-			// ·µ»ØĞŞ¸ÄÊ§°Ü
-			return FALSE;
-		}
-	}
-
-	// Ä¬ÈÏ·µ»ØĞŞ¸ÄÊ§°Ü
-	return FALSE;
-}
-
-
-// ÒÆ¶¯Ò»¸öÄ¿±êÊı¾İ¿â
-BOOL CSqliteManager::ReMoveDataBase(CString OldName, CString OldPath, CString NewName, CString NewPath, bool Console)
-{
-	// ³õÊ¼»¯Ä¿±êÊı¾İ¿â±äÁ¿
-	CString OldDatabasePath = OldPath, NewDatabasePath = NewPath;
-
-	// Èô¾ÉÄ¿±êÂ·¾¶²»Îª¿Õ
-	if (!OldPath.IsEmpty() || atoi((CStringA)OldPath) != NULL)
-	{
-		// Èç¹ûÄ¿±êÂ·¾¶²»°üº¬ \ ¾Í¼ÓÉÏ												   
-		if (OldDatabasePath.Right(1) != _T("\\"))
-			OldDatabasePath += _T("\\");
-
-		// ¸³ÓèÄ¿±êÊı¾İ¿âµÄÖµÎªÄ¿±êÂ·¾¶¼ÓÉÏÄ¿±êÎÄ¼şÃû
-		OldDatabasePath += OldName;
-	}
-	else
-	{
-		// ¸³ÓèÄ¿±êÊı¾İ¿âµÄÖµÎªµ±Ç°Â·¾¶¼ÓÉÏÄ¿±êÎÄ¼şÃû
-		OldDatabasePath = _T("./") + OldName;
-	}
-
-	// ÈôĞÂÄ¿±êÂ·¾¶²»Îª¿Õ
-	if (!NewPath.IsEmpty() || atoi((CStringA)NewPath) != NULL)
-	{
-		// Èç¹ûÄ¿±êÂ·¾¶²»°üº¬ \ ¾Í¼ÓÉÏ												   
-		if (NewDatabasePath.Right(1) != _T("\\"))
-			NewDatabasePath += _T("\\");
-
-		// ¸³ÓèÄ¿±êÊı¾İ¿âµÄÖµÎªÄ¿±êÂ·¾¶¼ÓÉÏÄ¿±êÎÄ¼şÃû
-		NewDatabasePath += NewName;
-	}
-	else
-	{
-		// ¸³ÓèÄ¿±êÊı¾İ¿âµÄÖµÎªµ±Ç°Â·¾¶¼ÓÉÏÄ¿±êÎÄ¼şÃû
-		NewDatabasePath = _T("./") + NewName;
-	}
-
-
-	// ²éÕÒ¾ÉÄ¿±êÊı¾İ¿âÊÇ·ñ´æÔÚ
-	CFileFind Finder;
-	BOOL Status = Finder.FindFile(OldDatabasePath);
-
-	// Èô²»´æÔÚ¾ÉÄ¿±êÊı¾İ¿âÔòÌáÊ¾´íÎóĞÅÏ¢
-	if (!Status)
-	{
-		// µ¯³ö´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("²»´æÔÚ¾ÉÄ¿±êÊı¾İ¿â,±¾´ÎÒÆ¶¯²Ù×÷Ê§°Ü!"));
-		else
-			std::cout<<"²»´æÔÚ¾ÉÄ¿±êÊı¾İ¿â,±¾´ÎÒÆ¶¯²Ù×÷Ê§°Ü!"<<std::endl;
-
-		// ·µ»ØÒÆ¶¯Ê§°Ü
-		return FALSE;
-	}
-	else
-	{
-		// ³¢ÊÔĞŞ¸ÄÊı¾İ¿â
-		try
-		{
-			// ÈôĞÂÄ¿±êÂ·¾¶²»Îª¿Õ
-			if (!NewPath.IsEmpty())
-			{
-				// ¼ì²éĞÂÄ¿±êÂ·¾¶ÊÇ·ñ´æÔÚ
-				DWORD DataPath = GetFileAttributes(NewPath);
-
-				// ÈôĞÂÄ¿±êÂ·¾¶²»´æÔÚ
-				if (DataPath == 0xFFFFFFFF)
-				{
-					// ´´½¨ĞÂÄ¿±êÂ·¾¶
-					CreateDirectory(NewPath, NULL);
-				}
-			}
-			else
-			{
-				// µ¯³ö´íÎóĞÅÏ¢
-				if(!Console)
-					AfxMessageBox(_T("ĞÂÄ¿±êÊı¾İ¿â²»ÄÜÎª¿Õ,ÒÆ¶¯Ä¿±êÊı¾İ¿âÊ§°Ü!"));
-				else
-					std::cout<<"ĞÂÄ¿±êÊı¾İ¿â²»ÄÜÎª¿Õ,ÒÆ¶¯Ä¿±êÊı¾İ¿âÊ§°Ü!"<<std::endl;
-
-				// ·µ»ØÒÆ¶¯Ê§°Ü
-				return FALSE;
-			}
-			if (MoveFileEx(OldDatabasePath, NewDatabasePath, MOVEFILE_COPY_ALLOWED| MOVEFILE_REPLACE_EXISTING))
-			{
-				// ·µ»ØÒÆ¶¯³É¹¦
-				return TRUE;
-			}
-			else
-			{
-				// µ¯³ö´íÎóĞÅÏ¢
-				if(!Console)
-					AfxMessageBox(_T("ÒÆ¶¯Ä¿±êÊı¾İ¿âÊ§°Ü!"));
-				else
-					std::cout<<"ÒÆ¶¯Ä¿±êÊı¾İ¿âÊ§°Ü!"<<std::endl;
-
-				// ·µ»ØÒÆ¶¯Ê§°Ü
-				return FALSE;
-			}
-		}
-		catch (...)
-		{
-			// µ¯³ö´íÎóĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("ÒÆ¶¯Ä¿±êÊı¾İ¿âÊ§°Ü!"));
-			else
-				std::cout<<"ÒÆ¶¯Ä¿±êÊı¾İ¿âÊ§°Ü!"<<std::endl;
-
-			// ·µ»ØÒÆ¶¯Ê§°Ü
-			return FALSE;
-		}
-	}
-
-	// Ä¬ÈÏ·µ»ØÒÆ¶¯Ê§°Ü
-	return FALSE;
-}
-
-
-// ¼ì²éÄ¿±êÊı¾İ¿â´æÔÚ
-BOOL CSqliteManager::CheckDataBase(CString Name, CString Path, bool Console)
-{
-	// ³õÊ¼»¯Ä¿±êÊı¾İ¿â±äÁ¿
-	CString DatabasePath = Path;
-
-	// ÈôÄ¿±êÂ·¾¶²»Îª¿Õ
-	if (!Path.IsEmpty() || atoi((CStringA)Path) != NULL)
-	{
-		// Èç¹ûÄ¿±êÂ·¾¶²»°üº¬ \ ¾Í¼ÓÉÏ												   
-		if (DatabasePath.Right(1) != _T("\\"))
-			DatabasePath += _T("\\");
-
-		// ¸³ÓèÄ¿±êÊı¾İ¿âµÄÖµÎªÄ¿±êÂ·¾¶¼ÓÉÏÄ¿±êÎÄ¼şÃû
-		DatabasePath += Name;
-	}
-	else
-	{
-		// ¸³ÓèÄ¿±êÊı¾İ¿âµÄÖµÎªµ±Ç°Â·¾¶¼ÓÉÏÄ¿±êÎÄ¼şÃû
-		DatabasePath = _T("./") + Name;
-	}
-
-
-	// ³¢ÊÔ´ò¿ªÊı¾İ¿â
+	// å°è¯•æ‰“å¼€æ•°æ®åº“
 	try
 	{
 		sqlite3 *Check_db;
-		if (sqlite3_open_v2((CStringA)DatabasePath, &Check_db, SQLITE_OPEN_READWRITE, NULL) != SQLITE_OK)
+		if (sqlite3_open_v2(Path.c_str(), &Check_db, SQLITE_OPEN_READWRITE, NULL) != SQLITE_OK)
 		{
-			// ·µ»Ø¼ì²éÊ§°Ü
-			return FALSE;
+			// è¿”å›æ£€æŸ¥å¤±è´¥
+			return false;
 		}
 		else
 		{
-			// ¹Ø±ÕÊı¾İ¿âÁ¬½Ó
+			// å…³é—­æ•°æ®åº“è¿æ¥
 			if (sqlite3_close(Check_db) != SQLITE_OK)
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, (CString)sqlite3_errmsg(Check_db), NULL, NULL);
-				else
-					std::cout<<sqlite3_errmsg(Check_db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(Check_db)<<std::endl;
 
-				// ·µ»Ø¹Ø±ÕÊ§°ÜĞÅÏ¢
-				return FALSE;
+				// è¿”å›å…³é—­å¤±è´¥ä¿¡æ¯
+				return false;
 			}
 
-			// ·µ»Ø¼ì²é³É¹¦
-			return TRUE;
+			// è¿”å›æ£€æŸ¥æˆåŠŸ
+			return true;
 		}
 	}
 	catch (...)
 	{
-		// µ¯³ö´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("ÎŞ·¨´ò¿ªÊı¾İ¿â!"));
-		else
-			std::cout<<"ÎŞ·¨´ò¿ªÊı¾İ¿â!"<<std::endl;
+		// å¼¹å‡ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ— æ³•æ‰“å¼€æ•°æ®åº“!"<<std::endl;
 
-		// ·µ»Ø¼ì²éÊ§°Ü
-		return FALSE;
+		// è¿”å›æ£€æŸ¥å¤±è´¥
+		return false;
 	}
 	
-	// Ä¬ÈÏ·µ»Ø¼ì²éÊ§°Ü
-	return FALSE;
+	// é»˜è®¤è¿”å›æ£€æŸ¥å¤±è´¥
+	return false;
 }
 
 
-// Í³¼ÆÄ¿±êÊı¾İ¿âÊıÁ¿
-BOOL CSqliteManager::CountDataBase(CString DataBasePath, int &Count, bool Console)
+// å»ºç«‹æœ¬åœ°æ•°æ®åº“è¿æ¥
+bool CSqliteManager::LocalConnect(string Path, string Password)
 {
-	Count = CountFile(DataBasePath);
-	return Count;
-}
+	// æ•°æ®åº“å¯¹è±¡é»˜è®¤ä¸ºç©º
+	db = NULL;
 
-
-// ±¸·İÄ¿±êÊı¾İ¿âÊı¾İ
-BOOL CSqliteManager::BackupDataBase(CString DataBasePath, CString BackupPath, bool Console)
-{
-	return CopyFile(DataBasePath, BackupPath, FALSE);
-}
-
-
-// »¹Ô­Ä¿±êÊı¾İ¿âÊı¾İ
-BOOL CSqliteManager::RestoreDataBase(CString DataBasePath, CString RestorePath, bool Console)
-{
-	return CopyFile(RestorePath, DataBasePath, FALSE);
-}
-
-
-// Ô¶³ÌÁ¬½ÓÄ¿±êÊı¾İ¿â
-BOOL CSqliteManager::RemoteDataBase(CString Name, CString Path, bool Console)
-{
-	return true;
-}
-
-
-// ¼ÓÃÜÄ¿±êÊı¾İ¿âÊı¾İ
-BOOL CSqliteManager::EncryptionDataBase(CString DataBaseName, CString Password, bool Console)
-{
-	return true;
-}
-
-
-// ½âÃÜÄ¿±êÊı¾İ¿âÊı¾İ
-BOOL CSqliteManager::DecryptionDataBase(CString DataBaseName, CString Password, bool Console)
-{
-	return true;
-}
-
-
-// ÉÏ´«Ô¶³ÌÄ¿±êÊı¾İ¿â
-BOOL CSqliteManager::UploadDataBase(CString DataBasePath, CString UploadPath, bool Console)
-{
-	return true;
-}
-
-
-// ÏÂÔØÔ¶³ÌÄ¿±êÊı¾İ¿â
-BOOL CSqliteManager::DownloadDataBase(CString DataBasePath, CString DownloadPath, bool Console)
-{
-	return true;
-}
-
-
-///////////////////////////////////Êı¾İ±í²Ù×÷´úÂë///////////////////////////////////
-
-
-// »ñÈ¡Êı¾İ¿âÖĞËùÓĞ±íµÄÃû³Æ
-BOOL CSqliteManager::GetTableName(CString &TableName, bool Console)
-{
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
-	if (!IsConnect)
+	// è‹¥æ•°æ®åº“å·²è¿æ¥æˆåŠŸ
+	if (IsConnect)
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"));
-		else
-			std::cout<<"Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"è¯¥æ•°æ®åº“å·²è¿æ¥ï¼Œä¸éœ€è¦å†æ¬¡è¿æ¥!"<<std::endl;
 
-		// ·µ»Ø´´½¨Ê§°ÜĞÅÏ¢
-		return FALSE;
+		// è¿”å›è¿æ¥å¤±è´¥ä¿¡æ¯
+		return false;
+	}
+
+	// åˆ¤æ–­æ˜¯å¦éœ€è¦è§£å¯†
+	if (!Password.empty())
+		DecryptionDataBase(Password);
+
+	// åˆ¤æ–­æ•°æ®åº“æ˜¯å¦å­˜åœ¨
+	if (sqlite3_open_v2(Path.c_str(), &db, SQLITE_OPEN_READWRITE, NULL) != SQLITE_OK)
+	{
+		// è¿”å›æ‰“å¼€å¤±è´¥ (æ•°æ®åº“ä¸å­˜åœ¨)
+		std::cout<<sqlite3_errmsg(db)<<std::endl;
+		return false;
 	}
 	else
 	{
-		// ÓÃÓÚÅĞ¶Ï²Ù×÷ÊÇ·ñ³É¹¦
-		BOOL IsSuccess;
+		// æ ‡ç¤ºæ•°æ®åº“å·²è¿æ¥
+		IsConnect = true;
 
-		// ³¢ÊÔÖ´ĞĞ»ñÈ¡Êı¾İ±íµÄ²Ù×÷
+		// è¿”å›æ•°æ®åº“è¿æ¥æˆåŠŸçš„ä¿¡æ¯
+		return true;
+	}
+}
+
+
+// è¿œç¨‹è¿æ¥ç›®æ ‡æ•°æ®åº“
+bool CSqliteManager::RemoteConnect(string Url, string Password)
+{
+	return true;
+}
+
+
+// åŠ å¯†ç›®æ ‡æ•°æ®åº“æ•°æ®
+bool CSqliteManager::EncryptionDataBase(string Password, string OldPassword)
+{
+	// å…ˆè§£å¯†
+	if (!OldPassword.empty())
+	{
+		if(!DecryptionDataBase(OldPassword))
+		{
+			// æ—§å¯†ç é”™è¯¯
+			return false;
+		}
+	}
+	
+	if(sqlite3_rekey(db, Password.c_str(), Password.length()) != SQLITE_OK)
+	{
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<sqlite3_errmsg(db)<<std::endl;
+
+		// è¿”å›é”™è¯¯ä¿¡æ¯
+		return false;
+	}
+
+	// è¿”å›æ•°æ®åº“åŠ å¯†æˆåŠŸçš„ä¿¡æ¯
+	return true;
+}
+
+
+// è§£å¯†ç›®æ ‡æ•°æ®åº“æ•°æ®
+bool CSqliteManager::DecryptionDataBase(string Password)
+{
+	if(sqlite3_key(db, Password.c_str(), Password.length()) != SQLITE_OK)
+	{
+		// æç¤ºé”™è¯¯ä¿¡æ¯ (å¯†ç é”™è¯¯)
+		std::cout<<sqlite3_errmsg(db)<<std::endl;
+
+		// è¿”å›é”™è¯¯ä¿¡æ¯
+		return false;
+	}
+
+	// è¿”å›æ•°æ®åº“è§£å¯†æˆåŠŸçš„ä¿¡æ¯
+	return true;
+}
+
+
+///////////////////////////////////æ•°æ®è¡¨æ“ä½œä»£ç ///////////////////////////////////
+
+
+// è·å–æ•°æ®åº“ä¸­æ‰€æœ‰è¡¨çš„åç§°
+bool CSqliteManager::GetTableName(string &TableData)
+{
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
+	if (!IsConnect)
+	{
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
+
+		// è¿”å›åˆ›å»ºå¤±è´¥ä¿¡æ¯
+		return false;
+	}
+	else
+	{
+		// ç”¨äºåˆ¤æ–­æ“ä½œæ˜¯å¦æˆåŠŸ
+		bool IsSuccess;
+
+		// å°è¯•æ‰§è¡Œè·å–æ•°æ®è¡¨çš„æ“ä½œ
 		try
 		{
-			// ³õÊ¼»¯SQLÓï¾ä
-			CStringA GetSQL = "Select name,sql From sqlite_master Where type = 'table' Order By name";
+			// åˆå§‹åŒ–SQLè¯­å¥
+			char* GetSQL = "Select name,sql From sqlite_master Where type = 'table' Order By name";
 
-			// Èô»ñÈ¡²Ù×÷Ê§°Ü
+			// è‹¥è·å–æ“ä½œå¤±è´¥
 			if (sqlite3_prepare(db, GetSQL, -1, &stmt, (const char**)errMsg) != SQLITE_OK)
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-				else
-					std::cout<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»Ø»ñÈ¡Ê§°Ü
-				IsSuccess = FALSE;
+				// è¿”å›è·å–å¤±è´¥
+				IsSuccess = false;
 			}
 
-			// Èô»ñÈ¡³É¹¦
+			// è‹¥è·å–æˆåŠŸ
 			else
 			{
-				// ÈôÊı¾İÎª¿Õ
+				// è‹¥æ•°æ®ä¸ºç©º
 				if (!stmt)
 				{
-					// ·µ»Ø¿ÕµÄ±íÃû
-					TableName = _T("");
+					// è¿”å›ç©ºçš„è¡¨å
+					TableData = "";
 
-					// ·µ»Ø»ñÈ¡Ê§°Ü
-					IsSuccess = FALSE;
+					// è¿”å›è·å–å¤±è´¥
+					IsSuccess = false;
 				}
 
-				// ÈôÊı¾İ²»Îª¿Õ
+				// è‹¥æ•°æ®ä¸ä¸ºç©º
 				else
 				{
-					// Ñ­»·»ñµÃ±íÃû
+					// æ•°æ®åˆå§‹åŒ–
+					TableData = "";
+
+					// å¾ªç¯è·å¾—è¡¨å
 					while (sqlite3_step(stmt) == SQLITE_ROW)
 					{
-						// µÃµ½¸Ã±í±íÃû²¢×Ô¼Ó
-						TableName += (CStringA)sqlite3_column_text(stmt, 0);
+						// å¾—åˆ°è¯¥è¡¨è¡¨åå¹¶è‡ªåŠ 
+						TableData += (char*)sqlite3_column_text(stmt, 0);
 
-						// ¼ÓÉÏ·Ö¸ô·ûÒÔÇø·Ö±í
-						TableName += _T(";");
+						// åŠ ä¸Šåˆ†éš”ç¬¦ä»¥åŒºåˆ†è¡¨
+						TableData += ";";
 					}
 
-					// ·µ»Ø»ñÈ¡³É¹¦
-					IsSuccess = TRUE;
+					// è¿”å›è·å–æˆåŠŸ
+					IsSuccess = true;
 				}
 			}
 
-			//ÊÍ·Å²éÑ¯½á¹û(ÎŞÂÛ²éÑ¯ÊÇ·ñ³É¹¦)
+			//é‡Šæ”¾æŸ¥è¯¢ç»“æœ(æ— è®ºæŸ¥è¯¢æ˜¯å¦æˆåŠŸ)
 			sqlite3_finalize(stmt);
 			stmt = NULL;
 		}
 		catch (...)
 		{
-			// µ¯³ö´íÎóĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("ÎŞ·¨´ÓÊı¾İ¿âÖĞ»ñµÃ±íÃû!"));
-			else
-				std::cout<<"ÎŞ·¨´ÓÊı¾İ¿âÖĞ»ñµÃ±íÃû!"<<std::endl;
+			// å¼¹å‡ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"æ— æ³•ä»æ•°æ®åº“ä¸­è·å¾—è¡¨å!"<<std::endl;
 
-			// ·µ»Ø¿ÕµÄ±íÃû
-			TableName = _T("");
+			// è¿”å›ç©ºçš„è¡¨å
+			TableData = "";
 
-			// ·µ»Ø»ñÈ¡Ê§°Ü
-			return FALSE;
+			// è¿”å›è·å–å¤±è´¥
+			return false;
 		}
 
-		// ·µ»Ø²Ù×÷½á¹û
+		// è¿”å›æ“ä½œç»“æœ
 		return IsSuccess;
 	}
 
-	// Ä¬ÈÏ·µ»Ø»ñÈ¡Ê§°Ü
-	return FALSE;
+	// é»˜è®¤è¿”å›è·å–å¤±è´¥
+	return false;
 }
 
 
-// »ñÈ¡Êı¾İ¿âÖĞËùÓĞ±íµÄÊı¾İ
-BOOL CSqliteManager::GetDataTable(CString &DataTable, bool Console)
+// è·å–æ•°æ®åº“ä¸­æ‰€æœ‰è¡¨çš„æ•°æ®
+bool CSqliteManager::GetDataTable(string &TableData)
 {
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
 	if (!IsConnect)
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"));
-		else
-			std::cout<<"Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
 
-		// ·µ»Ø´´½¨Ê§°ÜĞÅÏ¢
-		return FALSE;
+		// è¿”å›åˆ›å»ºå¤±è´¥ä¿¡æ¯
+		return false;
 	}
 	else
 	{
-		// ÓÃÓÚÅĞ¶Ï²Ù×÷ÊÇ·ñ³É¹¦
-		BOOL IsSuccess;
+		// ç”¨äºåˆ¤æ–­æ“ä½œæ˜¯å¦æˆåŠŸ
+		bool IsSuccess;
 
-		// ³¢ÊÔÖ´ĞĞ»ñÈ¡Êı¾İ±íµÄ²Ù×÷
+		// å°è¯•æ‰§è¡Œè·å–æ•°æ®è¡¨çš„æ“ä½œ
 		try
 		{
-			// ³õÊ¼»¯SQLÓï¾ä
-			CStringA GetSQL = "Select name,sql From sqlite_master Where type = 'table' Order By name";
+			// åˆå§‹åŒ–SQLè¯­å¥
+			char* GetSQL = "Select name,sql From sqlite_master Where type = 'table' Order By name";
 
-			// Èô»ñÈ¡²Ù×÷Ê§°Ü
+			// è‹¥è·å–æ“ä½œå¤±è´¥
 			if (sqlite3_prepare(db, GetSQL, -1, &stmt, (const char**)errMsg) != SQLITE_OK)
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-				else
-					std::cout<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»Ø»ñÈ¡Ê§°Ü
-				IsSuccess = FALSE;
+				// è¿”å›è·å–å¤±è´¥
+				IsSuccess = false;
 			}
 
-			// Èô»ñÈ¡³É¹¦
+			// è‹¥è·å–æˆåŠŸ
 			else
 			{
-				// ÈôÊı¾İÎª¿Õ
+				// è‹¥æ•°æ®ä¸ºç©º
 				if (!stmt)
 				{
-					// ·µ»Ø¿ÕµÄÊı¾İ
-					DataTable = _T("");
+					// è¿”å›ç©ºçš„æ•°æ®
+					TableData = "";
 
-					// ·µ»Ø»ñÈ¡Ê§°Ü
-					IsSuccess = FALSE;
+					// è¿”å›è·å–å¤±è´¥
+					IsSuccess = false;
 				}
 
-				// ÈôÊı¾İ²»Îª¿Õ
+				// è‹¥æ•°æ®ä¸ä¸ºç©º
 				else
 				{
-					// Ñ­»·»ñµÃ±íÃû
+					// æ•°æ®åˆå§‹åŒ–
+					TableData = "";
+
+					// å¾ªç¯è·å¾—è¡¨å
 					while (sqlite3_step(stmt) == SQLITE_ROW)
 					{
-						// µÃµ½¸Ã±íÊı¾İ²¢×Ô¼Ó
-						DataTable += (CStringA)sqlite3_column_text(stmt, 1);
+						// å¾—åˆ°è¯¥è¡¨æ•°æ®å¹¶è‡ªåŠ 
+						TableData += (char*)sqlite3_column_text(stmt, 1);
 
-						// ¼ÓÉÏ·Ö¸ô·ûÒÔÇø·Ö±í
-						DataTable += _T(";");
+						// åŠ ä¸Šåˆ†éš”ç¬¦ä»¥åŒºåˆ†è¡¨
+						TableData += ";";
 					}
 
-					// ·µ»Ø»ñÈ¡³É¹¦
-					IsSuccess = TRUE;
+					// è¿”å›è·å–æˆåŠŸ
+					IsSuccess = true;
 				}
 			}
 
-			//ÊÍ·Å²éÑ¯½á¹û(ÎŞÂÛ²éÑ¯ÊÇ·ñ³É¹¦)
+			//é‡Šæ”¾æŸ¥è¯¢ç»“æœ(æ— è®ºæŸ¥è¯¢æ˜¯å¦æˆåŠŸ)
 			sqlite3_finalize(stmt);
 			stmt = NULL;
 		}
 		catch (...)
 		{
-			// µ¯³ö´íÎóĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("ÎŞ·¨´ÓÊı¾İ¿âÖĞ»ñµÃ±íÃû!"));
-			else
-				std::cout<<"ÎŞ·¨´ÓÊı¾İ¿âÖĞ»ñµÃ±íÃû!"<<std::endl;
+			// å¼¹å‡ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"æ— æ³•ä»æ•°æ®åº“ä¸­è·å¾—è¡¨å!"<<std::endl;
 
-			// ·µ»Ø¿ÕµÄÊı¾İ
-			DataTable = _T("");
+			// è¿”å›ç©ºçš„æ•°æ®
+			TableData = "";
 
-			// ·µ»Ø»ñÈ¡Ê§°Ü
-			return FALSE;
+			// è¿”å›è·å–å¤±è´¥
+			return false;
 		}
 
-		// ·µ»Ø²Ù×÷½á¹û
+		// è¿”å›æ“ä½œç»“æœ
 		return IsSuccess;
 	}
 
-	// Ä¬ÈÏ·µ»Ø»ñÈ¡Ê§°Ü
-	return FALSE;
+	// é»˜è®¤è¿”å›è·å–å¤±è´¥
+	return false;
 }
 
 
-// »ñÈ¡Êı¾İ¿âÖĞÊı¾İ±íµÄĞÅÏ¢
-BOOL CSqliteManager::GetTableData(CString TableName, CString &SQL_Data, bool Console)
+// è·å–æ•°æ®åº“ä¸­æ•°æ®è¡¨çš„ä¿¡æ¯
+bool CSqliteManager::GetTableData(string TableName, string &TableData)
 {
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
 	if (!IsConnect)
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"));
-		else
-			std::cout<<"Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
 
-		// ·µ»Ø´´½¨Ê§°ÜĞÅÏ¢
-		return FALSE;
+		// è¿”å›åˆ›å»ºå¤±è´¥ä¿¡æ¯
+		return false;
 	}
 	else
 	{
-		// ÓÃÓÚÅĞ¶Ï²Ù×÷ÊÇ·ñ³É¹¦
-		BOOL IsSuccess;
+		// ç”¨äºåˆ¤æ–­æ“ä½œæ˜¯å¦æˆåŠŸ
+		bool IsSuccess;
 
-		// ³¢ÊÔÖ´ĞĞ»ñÈ¡Êı¾İ±íµÄ²Ù×÷
+		// å°è¯•æ‰§è¡Œè·å–æ•°æ®è¡¨çš„æ“ä½œ
 		try
 		{
-			// ³õÊ¼»¯SQLÓï¾ä
-			CStringA GetSQL = "Select name,sql From sqlite_master Where type = 'table' Order By name;";
+			// åˆå§‹åŒ–SQLè¯­å¥
+			char* GetSQL = "Select name,sql From sqlite_master Where type = 'table' Order By name;";
 
-			// Èô»ñÈ¡²Ù×÷Ê§°Ü
+			// è‹¥è·å–æ“ä½œå¤±è´¥
 			if (sqlite3_prepare(db, GetSQL, -1, &stmt, (const char**)errMsg) != SQLITE_OK)
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-				else
-					std::cout<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»Ø»ñÈ¡Ê§°Ü
-				IsSuccess = FALSE;
+				// è¿”å›è·å–å¤±è´¥
+				IsSuccess = false;
 			}
 
-			// Èô»ñÈ¡³É¹¦
+			// è‹¥è·å–æˆåŠŸ
 			else
 			{
-				// ÈôÊı¾İÎª¿Õ
+				// è‹¥æ•°æ®ä¸ºç©º
 				if (!stmt)
 				{
-					// ·µ»Ø¿ÕµÄÊı¾İ
-					SQL_Data = _T("");
+					// è¿”å›ç©ºçš„æ•°æ®
+					TableData = "";
 
-					// ·µ»Ø»ñÈ¡Ê§°Ü
-					IsSuccess = FALSE;
+					// è¿”å›è·å–å¤±è´¥
+					IsSuccess = false;
 				}
 
-				// ÈôÊı¾İ²»Îª¿Õ
+				// è‹¥æ•°æ®ä¸ä¸ºç©º
 				else
 				{
-					// Í¨¹ı±íÃûµÃµ½Êı¾İ
+					// æ•°æ®åˆå§‹åŒ–
+					TableData = "";
+
+					// é€šè¿‡è¡¨åå¾—åˆ°æ•°æ®
 					while (sqlite3_step(stmt) == SQLITE_ROW)
 					{
-						CStringA Name = (char *)sqlite3_column_text(stmt, 0);
+						string Name = (char*)sqlite3_column_text(stmt, 0);
 
-						if (Name == (CStringA)TableName)
+						if (Name == TableName)
 						{
-							// µÃµ½¸Ã±íÓï¾ä²¢×Ô¼Ó
-							SQL_Data = (char *)sqlite3_column_text(stmt, 1);
+							// å¾—åˆ°è¯¥è¡¨è¯­å¥å¹¶è‡ªåŠ 
+							TableData = (char*)sqlite3_column_text(stmt, 1);
 
-							// ·µ»Ø»ñÈ¡³É¹¦
-							IsSuccess = TRUE;
+							// è¿”å›è·å–æˆåŠŸ
+							IsSuccess = true;
 						}
 						else
 						{
-							// ·µ»Ø»ñÈ¡Ê§°Ü
-							IsSuccess = FALSE;
+							// è¿”å›è·å–å¤±è´¥
+							IsSuccess = false;
 						}
 					}
 				}
 			}
 
-			//ÊÍ·Å²éÑ¯½á¹û(ÎŞÂÛ²éÑ¯ÊÇ·ñ³É¹¦)
+			//é‡Šæ”¾æŸ¥è¯¢ç»“æœ(æ— è®ºæŸ¥è¯¢æ˜¯å¦æˆåŠŸ)
 			sqlite3_finalize(stmt);
 			stmt = NULL;
 		}
 		catch (...)
 		{
-			// µ¯³ö´íÎóĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("ÎŞ·¨´ÓÊı¾İ±íÖĞ»ñµÃÊı¾İ!"));
-			else
-				std::cout<<"ÎŞ·¨´ÓÊı¾İ±íÖĞ»ñµÃÊı¾İ!"<<std::endl;
+			// å¼¹å‡ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"æ— æ³•ä»æ•°æ®è¡¨ä¸­è·å¾—æ•°æ®!"<<std::endl;
 
-			// ·µ»Ø¿ÕµÄÓï¾ä
-			SQL_Data = _T("");
+			// è¿”å›ç©ºçš„è¯­å¥
+			TableData = "";
 
-			// ·µ»Ø»ñÈ¡Ê§°Ü
-			return FALSE;
+			// è¿”å›è·å–å¤±è´¥
+			return false;
 		}
 
-		// ·µ»Ø²Ù×÷½á¹û
+		// è¿”å›æ“ä½œç»“æœ
 		return IsSuccess;
 	}
 
-	// Ä¬ÈÏ·µ»Ø»ñÈ¡Ê§°Ü
-	return FALSE;
+	// é»˜è®¤è¿”å›è·å–å¤±è´¥
+	return false;
 }
 
 
-// »ñµÃÊı¾İ±íÖĞËùÓĞÁĞµÄÃû³Æ
-BOOL CSqliteManager::GetColName(CString TableName, CString &ColName, bool Console)
+// è·å¾—æ•°æ®è¡¨ä¸­æ‰€æœ‰åˆ—çš„åç§°
+bool CSqliteManager::GetColName(string TableName, string &ColName)
 {
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
 	if (!IsConnect)
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"));
-		else
-			std::cout<<"Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
 
-		// ·µ»Ø´´½¨Ê§°ÜĞÅÏ¢
-		return FALSE;
+		// è¿”å›åˆ›å»ºå¤±è´¥ä¿¡æ¯
+		return false;
 	}
 	else
 	{
-		// ÓÃÓÚÅĞ¶Ï²Ù×÷ÊÇ·ñ³É¹¦
-		BOOL IsSuccess = FALSE;
+		// ç”¨äºåˆ¤æ–­æ“ä½œæ˜¯å¦æˆåŠŸ
+		bool IsSuccess = false;
+		int count = 0;
 
-		// ³¢ÊÔÖ´ĞĞ»ñÈ¡Êı¾İ±íÖĞÁĞÃûµÄ²Ù×÷
+		CountData(TableName, "", count);
+		if(count <= 0)
+		{
+			// æç¤ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"ç›®æ ‡æ•°æ®è¡¨æ²¡æœ‰æ•°æ®, æ— æ³•è·å–åˆ—æ•°æ®!"<<std::endl;
+
+			// è¿”å›è·å–å¤±è´¥
+			return false;
+		}
+
+		// å°è¯•æ‰§è¡Œè·å–æ•°æ®è¡¨ä¸­åˆ—åçš„æ“ä½œ
 		try
 		{
-			// ³õÊ¼»¯SQLÓï¾ä
-			CStringA GetSQL = "SELECT * FROM " + (CStringA)TableName + " limit 0,1";
+			// åˆå§‹åŒ–SQLè¯­å¥
+			string GetSQL = "SELECT * FROM " + TableName + " limit 0,1";
 
-			// Èô»ñÈ¡²Ù×÷Ê§°Ü
-			if (sqlite3_get_table(db, GetSQL, &pRes, &nRow, &nCol, &errMsg) != SQLITE_OK)
+			// è‹¥è·å–æ“ä½œå¤±è´¥
+			if (sqlite3_get_table(db, GetSQL.c_str(), &pRes, &nRow, &nCol, &errMsg) != SQLITE_OK)
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-				else
-					std::cout<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»Ø»ñÈ¡Ê§°Ü
-				IsSuccess = FALSE;
+				// è¿”å›è·å–å¤±è´¥
+				IsSuccess = false;
 			}
 
-			// Èô»ñÈ¡³É¹¦
+			// è‹¥è·å–æˆåŠŸ
 			else
 			{
-				// ÈôÊı¾İÎª¿Õ
+				// è‹¥æ•°æ®ä¸ºç©º
 				if (!nRow)
 				{
-					// ·µ»Ø¿ÕµÄÁĞÃû
-					ColName = _T("");
+					// è¿”å›ç©ºçš„åˆ—å
+					ColName = "";
 
-					// ·µ»Ø»ñÈ¡Ê§°Ü
-					IsSuccess = FALSE;
+					// è¿”å›è·å–å¤±è´¥
+					IsSuccess = false;
 				}
 
-				// ÈôÊı¾İ²»Îª¿Õ
+				// è‹¥æ•°æ®ä¸ä¸ºç©º
 				else
 				{
-					// Ñ­»·»ñµÃÁĞÃû
+					// æ•°æ®åˆå§‹åŒ–
+					ColName = "";
+
+					// å¾ªç¯è·å¾—åˆ—å
 					for (int i = 0; i < nRow; i++)
 					{
 						for (int j = 0; j < nCol; j++)
 						{
 							char *pv = *(pRes + nCol*i + j);
 
-							// ÁĞÃû×Ô¼Ó
+							// åˆ—åè‡ªåŠ 
 							ColName += pv;
 
-							// ¼ÓÉÏ·Ö¸ô·ûÒÔÇø·ÖÁĞ
-							ColName += _T(";");
+							// åŠ ä¸Šåˆ†éš”ç¬¦ä»¥åŒºåˆ†åˆ—
+							ColName += ";";
 						}
 						break;
 					}
 
-					// ÊÍ·Å×ÊÔ´
+					// é‡Šæ”¾èµ„æº
 					if (errMsg != NULL)
 					{
 						sqlite3_free(errMsg);
 					}
 
-					// ·µ»Ø»ñÈ¡³É¹¦
-					IsSuccess = TRUE;
+					// è¿”å›è·å–æˆåŠŸ
+					IsSuccess = true;
 				}
 			}
 
-			//ÊÍ·Å²éÑ¯½á¹û(ÎŞÂÛ²éÑ¯ÊÇ·ñ³É¹¦)
+			//é‡Šæ”¾æŸ¥è¯¢ç»“æœ(æ— è®ºæŸ¥è¯¢æ˜¯å¦æˆåŠŸ)
 			sqlite3_free_table(pRes);
 			pRes = NULL;
 		}
 		catch (...)
 		{
-			// µ¯³ö´íÎóĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("ÎŞ·¨´ÓÊı¾İ¿âÖĞ»ñµÃ±íÃû!"));
-			else
-				std::cout<<"ÎŞ·¨´ÓÊı¾İ¿âÖĞ»ñµÃ±íÃû!"<<std::endl;
+			// å¼¹å‡ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"æ— æ³•ä»æ•°æ®åº“ä¸­è·å¾—è¡¨å!"<<std::endl;
 
-			// ·µ»Ø¿ÕµÄÁĞÃû
-			ColName = _T("");
+			// è¿”å›ç©ºçš„åˆ—å
+			ColName = "";
 
-			// ·µ»Ø»ñÈ¡Ê§°Ü
-			return FALSE;
+			// è¿”å›è·å–å¤±è´¥
+			return false;
 		}
 
-		// ·µ»Ø²Ù×÷½á¹û
+		// è¿”å›æ“ä½œç»“æœ
 		return IsSuccess;
 	}
 
-	// Ä¬ÈÏ·µ»Ø»ñÈ¡Ê§°Ü
-	return FALSE;
+	// é»˜è®¤è¿”å›è·å–å¤±è´¥
+	return false;
 }
 
 
-// »ñµÃÊı¾İ±íÖĞËùÓĞÁĞµÄÀàĞÍ
-BOOL CSqliteManager::GetColType(CString TableName, CString &ColType, bool Console)
+// è·å¾—æ•°æ®è¡¨ä¸­æ‰€æœ‰åˆ—çš„ç±»å‹
+bool CSqliteManager::GetColType(string TableName, string &ColType)
 {
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
 	if (!IsConnect)
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"));
-		else
-			std::cout<<"Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
 
-		// ·µ»Ø´´½¨Ê§°ÜĞÅÏ¢
-		return FALSE;
+		// è¿”å›åˆ›å»ºå¤±è´¥ä¿¡æ¯
+		return false;
 	}
 	else
 	{
-		// ÓÃÓÚÅĞ¶Ï²Ù×÷ÊÇ·ñ³É¹¦
-		BOOL IsSuccess = FALSE;
+		// ç”¨äºåˆ¤æ–­æ“ä½œæ˜¯å¦æˆåŠŸ
+		bool IsSuccess = false;
+		int count = 0;
 
-		// ³¢ÊÔÖ´ĞĞ»ñÈ¡Êı¾İ±íµÄ²Ù×÷
+		CountData(TableName, "", count);
+		if(count <= 0)
+		{
+			// æç¤ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"ç›®æ ‡æ•°æ®è¡¨æ²¡æœ‰æ•°æ®, æ— æ³•è·å–åˆ—æ•°æ®!"<<std::endl;
+
+			// è¿”å›è·å–å¤±è´¥
+			return false;
+		}
+
+		// å°è¯•æ‰§è¡Œè·å–æ•°æ®è¡¨çš„æ“ä½œ
 		try
 		{
-			// ³õÊ¼»¯SQLÓï¾ä
-			CStringA GetSQL = "SELECT * FROM " + (CStringA)TableName + " limit 0,1";
+			// åˆå§‹åŒ–SQLè¯­å¥
+			string GetSQL = "SELECT * FROM " + TableName + " limit 0,1";
 
-			// Èô»ñÈ¡²Ù×÷Ê§°Ü
-			if (sqlite3_prepare(db, GetSQL, -1, &stmt, (const char**)errMsg) != SQLITE_OK)
+			// è‹¥è·å–æ“ä½œå¤±è´¥
+			if (sqlite3_prepare(db, GetSQL.c_str(), -1, &stmt, (const char**)errMsg) != SQLITE_OK)
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-				else
-					std::cout<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»Ø»ñÈ¡Ê§°Ü
-				IsSuccess = FALSE;
+				// è¿”å›è·å–å¤±è´¥
+				IsSuccess = false;
 			}
 
-			// Èô»ñÈ¡³É¹¦
+			// è‹¥è·å–æˆåŠŸ
 			else
 			{
-				// ÈôÊı¾İÎª¿Õ
+				// è‹¥æ•°æ®ä¸ºç©º
 				if (!stmt)
 				{
-					// ·µ»Ø¿ÕµÄÀàĞÍ
-					ColType = _T("");
+					// è¿”å›ç©ºçš„ç±»å‹
+					ColType = "";
 
-					// ·µ»Ø»ñÈ¡Ê§°Ü
-					IsSuccess = FALSE;
+					// è¿”å›è·å–å¤±è´¥
+					IsSuccess = false;
 				}
 
-				// ÈôÊı¾İ²»Îª¿Õ
+				// è‹¥æ•°æ®ä¸ä¸ºç©º
 				else
 				{
-					// Ñ­»·»ñµÃÀàĞÍ
+					// å¾ªç¯è·å¾—ç±»å‹
 					while (sqlite3_step(stmt) == SQLITE_ROW)
 					{
-						// »ñµÃÁĞÊı
+						// è·å¾—åˆ—æ•°
 						int nCount = sqlite3_column_count(stmt);
+
+						// æ•°æ®åˆå§‹åŒ–
+						ColType = "";
 
 						for (int i = 0; i < nCount; i++)
 						{
 							int nValue = sqlite3_column_int(stmt, 0);
 							int nType = sqlite3_column_type(stmt, i);
 
-							// ÅĞ¶ÏÀàĞÍ
+							// åˆ¤æ–­ç±»å‹
 							switch (nType)
 							{
 							case 1:
-								// INTEGER ÀàĞÍ
-								ColType += _T("SQLITE_INTEGER");
+								// INTEGER ç±»å‹
+								ColType += "SQLITE_INTEGER";
 
-								// ¼ÓÉÏ·Ö¸ô·ûÒÔÇø·ÖÀàĞÍ
-								ColType += _T(";");
+								// åŠ ä¸Šåˆ†éš”ç¬¦ä»¥åŒºåˆ†ç±»å‹
+								ColType += ";";
 								break;
 							case 2:
-								// FLOAT ÀàĞÍ
-								ColType += _T("SQLITE_FLOAT");
+								// FLOAT ç±»å‹
+								ColType += "SQLITE_FLOAT";
 
-								// ¼ÓÉÏ·Ö¸ô·ûÒÔÇø·ÖÀàĞÍ
-								ColType += _T(";");
+								// åŠ ä¸Šåˆ†éš”ç¬¦ä»¥åŒºåˆ†ç±»å‹
+								ColType += ";";
 								break;
 							case 3:
-								// TEXT ÀàĞÍ
-								ColType += _T("SQLITE_TEXT");
+								// TEXT ç±»å‹
+								ColType += "SQLITE_TEXT";
 
-								// ¼ÓÉÏ·Ö¸ô·ûÒÔÇø·ÖÀàĞÍ
-								ColType += _T(";");
+								// åŠ ä¸Šåˆ†éš”ç¬¦ä»¥åŒºåˆ†ç±»å‹
+								ColType += ";";
 								break;
 							case 4:
-								// BLOB ÀàĞÍ
-								ColType += _T("SQLITE_BLOB");
+								// BLOB ç±»å‹
+								ColType += "SQLITE_BLOB";
 
-								// ¼ÓÉÏ·Ö¸ô·ûÒÔÇø·ÖÀàĞÍ
-								ColType += _T(";");
+								// åŠ ä¸Šåˆ†éš”ç¬¦ä»¥åŒºåˆ†ç±»å‹
+								ColType += ";";
 								break;
 							case 5:
-								// NULL ÀàĞÍ
-								ColType += _T("SQLITE_NULL");
+								// NULL ç±»å‹
+								ColType += "SQLITE_NULL";
 
-								// ¼ÓÉÏ·Ö¸ô·ûÒÔÇø·ÖÀàĞÍ
-								ColType += _T(";");
+								// åŠ ä¸Šåˆ†éš”ç¬¦ä»¥åŒºåˆ†ç±»å‹
+								ColType += ";";
 								break;
 							}
 						}
 						break;
 					}
 
-					// ·µ»Ø»ñÈ¡³É¹¦
-					IsSuccess = TRUE;
+					// è¿”å›è·å–æˆåŠŸ
+					IsSuccess = true;
 				}
 			}
 
-			//ÊÍ·Å²éÑ¯½á¹û(ÎŞÂÛ²éÑ¯ÊÇ·ñ³É¹¦)
+			//é‡Šæ”¾æŸ¥è¯¢ç»“æœ(æ— è®ºæŸ¥è¯¢æ˜¯å¦æˆåŠŸ)
 			sqlite3_finalize(stmt);
 			stmt = NULL;
 		}
 		catch (...)
 		{
-			// µ¯³ö´íÎóĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("ÎŞ·¨´ÓÊı¾İ±íÖĞ»ñµÃÀàĞÍ!"));
-			else
-				std::cout<<"ÎŞ·¨´ÓÊı¾İ±íÖĞ»ñµÃÀàĞÍ!"<<std::endl;
+			// å¼¹å‡ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"æ— æ³•ä»æ•°æ®è¡¨ä¸­è·å¾—ç±»å‹!"<<std::endl;
 
-			// ·µ»Ø¿ÕµÄÀàĞÍÃû
-			TableName = _T("");
+			// è¿”å›ç©ºçš„ç±»å‹å
+			TableName = "";
 
-			// ·µ»Ø»ñÈ¡Ê§°Ü
-			return FALSE;
+			// è¿”å›è·å–å¤±è´¥
+			return false;
 		}
 
-		// ·µ»Ø²Ù×÷½á¹û
+		// è¿”å›æ“ä½œç»“æœ
 		return IsSuccess;
 	}
 
-	// Ä¬ÈÏ·µ»Ø»ñÈ¡Ê§°Ü
-	return FALSE;
+	// é»˜è®¤è¿”å›è·å–å¤±è´¥
+	return false;
 }
 
 
-// ÔÚÄ¿±êÊı¾İ¿âÖĞ´´½¨Êı¾İ±í
-BOOL CSqliteManager::CreateDataTable(CString TableName, CString Params, bool Console)
+// è·å¾—æ•°æ®è¡¨ä¸­æ‰€æœ‰åˆ—çš„æ•°é‡
+bool CSqliteManager::CountColName(string TableName, int &Count)
 {
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
+	// è·å–åˆ—å
+	string ColName;
+	GetColName(TableName, ColName);
+
+	// åˆ†å‰²å­—ç¬¦ä¸²
+	vector<string> pArray;
+	Split(ColName, pArray, ";");
+
+	// è·å–åˆ—æ•°å¹¶è¿”å›
+	Count = pArray.size();
+	return Count <= 0 ? false : true;
+}
+
+
+// åœ¨ç›®æ ‡æ•°æ®åº“ä¸­åˆ›å»ºæ•°æ®è¡¨
+bool CSqliteManager::CreateDataTable(string TableName, string Params)
+{
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
 	if (!IsConnect)
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"));
-		else
-			std::cout<<"Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
 
-		// ·µ»Ø´´½¨Ê§°ÜĞÅÏ¢
-		return FALSE;
+		// è¿”å›åˆ›å»ºå¤±è´¥ä¿¡æ¯
+		return false;
 	}
 	else
 	{
-		// ³¢ÊÔÖ´ĞĞ´´½¨Êı¾İ±íµÄ²Ù×÷
+		// å°è¯•æ‰§è¡Œåˆ›å»ºæ•°æ®è¡¨çš„æ“ä½œ
 		try
 		{
-			// ³õÊ¼»¯SQLÓï¾ä
-			CStringA CreateSQL = "CREATE TABLE IF Not Exists " + (CStringA)TableName + " ( " + (CStringA)Params + " );";
+			// åˆå§‹åŒ–SQLè¯­å¥
+			string CreateSQL = "CREATE TABLE IF Not Exists " + TableName + " ( " + Params + " );";
 
-			//Êı¾İ¿âÆô¶¯Ò»¸öÊÂÎï
+			//æ•°æ®åº“å¯åŠ¨ä¸€ä¸ªäº‹ç‰©
 			if (!transaction(db))
 			{
-				if(!Console)
-					AfxMessageBox(_T("ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"));
-				else
-					std::cout<<"ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"<<std::endl;
-
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<"æ— æ³•å¯åŠ¨äº‹åŠ¡å¤„ç†!"<<std::endl;
 				return false;
 			}
 
-			// Èô´´½¨²Ù×÷Ê§°Ü
-			if (sqlite3_exec(db, CreateSQL, NULL, NULL, NULL) != SQLITE_OK)
+			// è‹¥åˆ›å»ºæ“ä½œå¤±è´¥
+			if (sqlite3_exec(db, CreateSQL.c_str(), NULL, NULL, NULL) != SQLITE_OK)
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-				else
-					std::cout<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»Ø´´½¨Ê§°Ü
-				return FALSE;
-			}
-
-			//Ìá½»ÊÂÎñ
-			if (commitTransaction(db) == false)
-			{
-				// »Ø¹öÊÂÎñ
-				rollbackTransaction(db);
-
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					AfxMessageBox(_T("´´½¨Êı¾İ±íÊ§°Ü: ") + (CString)sqlite3_errmsg(db));
-				else
-					std::cout<<"´´½¨Êı¾İ±íÊ§°Ü: "<<sqlite3_errmsg(db)<<std::endl;
-
-				// ·µ»Ø´´½¨Ê§°Ü
-				return FALSE;
-			}
-
-			// ·µ»Ø´´½¨³É¹¦
-			else
-				return TRUE;
-		}
-		catch (...)
-		{
-			// ÌáÊ¾´íÎóĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("´´½¨Êı¾İ±íÊ§°Ü!"));
-			else
-				std::cout<<"´´½¨Êı¾İ±íÊ§°Ü!"<<std::endl;
-
-			// ·µ»Ø´´½¨Ê§°Ü
-			return FALSE;
-		}
-	}
-
-	// Ä¬ÈÏ·µ»Ø´´½¨Ê§°Ü
-	return FALSE;
-}
-
-
-// ÔÚÄ¿±êÊı¾İ¿âÖĞÉ¾³ıÊı¾İ±í
-BOOL CSqliteManager::DeleteDataTable(CString TableName, bool Console)
-{
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
-	if (!IsConnect)
-	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"));
-		else
-			std::cout<<"Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"<<std::endl;
-
-		// ·µ»ØÉ¾³ıÊ§°ÜĞÅÏ¢
-		return FALSE;
-	}
-	else
-	{
-		// ³¢ÊÔÖ´ĞĞÉ¾³ıÊı¾İ±íµÄ²Ù×÷
-		try
-		{
-			// ³õÊ¼»¯SQLÓï¾ä
-			CStringA DeleteSQL = "Drop TABLE " + (CStringA)TableName + ";";
-
-			//Êı¾İ¿âÆô¶¯Ò»¸öÊÂÎï
-			if (!transaction(db))
-			{
-				if(!Console)
-					AfxMessageBox(_T("ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"));
-				else
-					std::cout<<"ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"<<std::endl;
-
+				// è¿”å›åˆ›å»ºå¤±è´¥
 				return false;
 			}
 
-			// ÈôÉ¾³ı²Ù×÷Ê§°Ü
-			if (sqlite3_exec(db, DeleteSQL, NULL, NULL, NULL) != SQLITE_OK)
-			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-				else
-					std::cout<<sqlite3_errmsg(db)<<std::endl;
-
-				// ·µ»ØÉ¾³ıÊ§°ÜĞÅÏ¢
-				return FALSE;
-			}
-
-			//Ìá½»ÊÂÎñ
+			//æäº¤äº‹åŠ¡
 			if (commitTransaction(db) == false)
 			{
-				// »Ø¹öÊÂÎñ
+				// å›æ»šäº‹åŠ¡
 				rollbackTransaction(db);
 
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					AfxMessageBox(_T("É¾³ıÊı¾İ±íÊ§°Ü: ") + (CString)sqlite3_errmsg(db));
-				else
-					std::cout<<"É¾³ıÊı¾İ±íÊ§°Ü: "<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<"åˆ›å»ºæ•°æ®è¡¨å¤±è´¥: "<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»ØÉ¾³ıÊ§°ÜĞÅÏ¢
-				return FALSE;
+				// è¿”å›åˆ›å»ºå¤±è´¥
+				return false;
 			}
 
-			// ·µ»ØÉ¾³ı³É¹¦ĞÅÏ¢
+			// è¿”å›åˆ›å»ºæˆåŠŸ
 			else
-				return TRUE;
+				return true;
 		}
 		catch (...)
 		{
-			// ÌáÊ¾´íÎóĞÅÏ¢ĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("É¾³ıÊı¾İ±íÊ§°Ü!"));
-			else
-				std::cout<<"É¾³ıÊı¾İ±íÊ§°Ü!"<<std::endl;
+			// æç¤ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"åˆ›å»ºæ•°æ®è¡¨å¤±è´¥!"<<std::endl;
 
-			// ·µ»ØÉ¾³ıÊ§°ÜĞÅÏ¢
-			return FALSE;
+			// è¿”å›åˆ›å»ºå¤±è´¥
+			return false;
 		}
 	}
 
-	// Ä¬ÈÏ·µ»ØÉ¾³ıÊ§°ÜĞÅÏ¢
-	return FALSE;
+	// é»˜è®¤è¿”å›åˆ›å»ºå¤±è´¥
+	return false;
 }
 
 
-// ÔÚÄ¿±êÊı¾İ¿âÖĞĞŞ¸ÄÊı¾İ±í
-BOOL CSqliteManager::UpdataDataTable(CString TableName, int Operation, CString Params, CString NewParams, bool Console)
+// åœ¨ç›®æ ‡æ•°æ®åº“ä¸­åˆ é™¤æ•°æ®è¡¨
+bool CSqliteManager::DeleteDataTable(string TableName)
 {
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
 	if (!IsConnect)
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"));
-		else
-			std::cout<<"Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
 
-		// ·µ»ØĞŞ¸ÄÊ§°ÜĞÅÏ¢
-		return FALSE;
+		// è¿”å›åˆ é™¤å¤±è´¥ä¿¡æ¯
+		return false;
 	}
 	else
 	{
-		// ¸ù¾İ²ÎÊı³¢ÊÔ²»Í¬SQL²Ù×÷
+		// å°è¯•æ‰§è¡Œåˆ é™¤æ•°æ®è¡¨çš„æ“ä½œ
+		try
+		{
+			// åˆå§‹åŒ–SQLè¯­å¥
+			string DeleteSQL = "Drop TABLE " + TableName + ";";
+
+			//æ•°æ®åº“å¯åŠ¨ä¸€ä¸ªäº‹ç‰©
+			if (!transaction(db))
+			{
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<"æ— æ³•å¯åŠ¨äº‹åŠ¡å¤„ç†!"<<std::endl;
+				return false;
+			}
+
+			// è‹¥åˆ é™¤æ“ä½œå¤±è´¥
+			if (sqlite3_exec(db, DeleteSQL.c_str(), NULL, NULL, NULL) != SQLITE_OK)
+			{
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(db)<<std::endl;
+
+				// è¿”å›åˆ é™¤å¤±è´¥ä¿¡æ¯
+				return false;
+			}
+
+			//æäº¤äº‹åŠ¡
+			if (commitTransaction(db) == false)
+			{
+				// å›æ»šäº‹åŠ¡
+				rollbackTransaction(db);
+
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<"åˆ é™¤æ•°æ®è¡¨å¤±è´¥: "<<sqlite3_errmsg(db)<<std::endl;
+
+				// è¿”å›åˆ é™¤å¤±è´¥ä¿¡æ¯
+				return false;
+			}
+
+			// è¿”å›åˆ é™¤æˆåŠŸä¿¡æ¯
+			else
+				return true;
+		}
+		catch (...)
+		{
+			// æç¤ºé”™è¯¯ä¿¡æ¯ä¿¡æ¯
+			std::cout<<"åˆ é™¤æ•°æ®è¡¨å¤±è´¥!"<<std::endl;
+
+			// è¿”å›åˆ é™¤å¤±è´¥ä¿¡æ¯
+			return false;
+		}
+	}
+
+	// é»˜è®¤è¿”å›åˆ é™¤å¤±è´¥ä¿¡æ¯
+	return false;
+}
+
+
+// åœ¨ç›®æ ‡æ•°æ®åº“ä¸­ä¿®æ”¹æ•°æ®è¡¨
+bool CSqliteManager::UpdataDataTable(string TableName, int Operation, string Params, string NewParams)
+{
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
+	if (!IsConnect)
+	{
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
+
+		// è¿”å›ä¿®æ”¹å¤±è´¥ä¿¡æ¯
+		return false;
+	}
+	else
+	{
+		// æ ¹æ®å‚æ•°å°è¯•ä¸åŒSQLæ“ä½œ
 		switch (Operation)
 		{
-		// ÖØÃüÃûÊı¾İ±í
+		// é‡å‘½åæ•°æ®è¡¨
 		case REN_TABLE:
 		{
 			try
 			{
-				// ³õÊ¼»¯SQLÓï¾ä
-				CStringA ReNameTableSQL = "ALTER TABLE " + (CStringA)TableName + " RENAME TO " + (CStringA)Params + ";";
+				// åˆå§‹åŒ–SQLè¯­å¥
+				string ReNameTableSQL = "ALTER TABLE " + TableName + " RENAME TO " + Params + ";";
 
-				//Êı¾İ¿âÆô¶¯Ò»¸öÊÂÎï
+				//æ•°æ®åº“å¯åŠ¨ä¸€ä¸ªäº‹ç‰©
 				if (!transaction(db))
 				{
-					if(!Console)
-						AfxMessageBox(_T("ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"));
-					else
-						std::cout<<"ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"<<std::endl;
-
+					// æç¤ºé”™è¯¯ä¿¡æ¯
+					std::cout<<"æ— æ³•å¯åŠ¨äº‹åŠ¡å¤„ç†!"<<std::endl;
 					return false;
 				}
 
-				// ÈôÌí¼Ó²Ù×÷Ê§°Ü
-				if (sqlite3_exec(db, ReNameTableSQL, NULL, NULL, NULL) != SQLITE_OK)
+				// è‹¥æ·»åŠ æ“ä½œå¤±è´¥
+				if (sqlite3_exec(db, ReNameTableSQL.c_str(), NULL, NULL, NULL) != SQLITE_OK)
 				{
-					// ÌáÊ¾´íÎóĞÅÏ¢
-					if(!Console)
-						::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-					else
-						std::cout<<sqlite3_errmsg(db)<<std::endl;
+					// æç¤ºé”™è¯¯ä¿¡æ¯
+					std::cout<<sqlite3_errmsg(db)<<std::endl;
 
-					// ·µ»ØÖØÃüÃûÊ§°Ü
-					return FALSE;
+					// è¿”å›é‡å‘½åå¤±è´¥
+					return false;
 				}
 
-				//Ìá½»ÊÂÎñ
+				//æäº¤äº‹åŠ¡
 				if (commitTransaction(db) == false)
 				{
-					// »Ø¹öÊÂÎñ
+					// å›æ»šäº‹åŠ¡
 					rollbackTransaction(db);
 
-					// ÌáÊ¾´íÎóĞÅÏ¢
-					if(!Console)
-						AfxMessageBox(_T("ÖØÃüÃûÊı¾İ±íÊ§°Ü: ") + (CString)sqlite3_errmsg(db));
-					else
-						std::cout<<"ÖØÃüÃûÊı¾İ±íÊ§°Ü: "<<sqlite3_errmsg(db)<<std::endl;
+					// æç¤ºé”™è¯¯ä¿¡æ¯
+					std::cout<<"é‡å‘½åæ•°æ®è¡¨å¤±è´¥: "<<sqlite3_errmsg(db)<<std::endl;
 
-					// ·µ»ØÖØÃüÃûÊ§°Ü
-					return FALSE;
+					// è¿”å›é‡å‘½åå¤±è´¥
+					return false;
 				}
 
-				// ·µ»ØÖØÃüÃû³É¹¦
+				// è¿”å›é‡å‘½åæˆåŠŸ
 				else
-					return TRUE;
+					return true;
 			}
 			catch (...)
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					AfxMessageBox(_T("ÖØÃüÃûÊı¾İ±íÊ§°Ü!"));
-				else
-					std::cout<<"ÖØÃüÃûÊı¾İ±íÊ§°Ü!"<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<"é‡å‘½åæ•°æ®è¡¨å¤±è´¥!"<<std::endl;
 
-				// ·µ»ØÖØÃüÃûÊ§°Ü
-				return FALSE;
+				// è¿”å›é‡å‘½åå¤±è´¥
+				return false;
 			}
 
 		}break;
 
-		// Ìí¼ÓÁĞ
+		// æ·»åŠ åˆ—
 		case ADD_COLUMN:
 		{
 			try
 			{
-				// ³õÊ¼»¯SQLÓï¾ä
-				CStringA Add_Column_SQL = "ALTER TABLE " + (CStringA)TableName + " ADD COLUMN " + (CStringA)Params + ";";
+				// åˆå§‹åŒ–SQLè¯­å¥
+				string Add_Column_SQL = "ALTER TABLE " + TableName + " ADD COLUMN " + Params + ";";
 
-				//Êı¾İ¿âÆô¶¯Ò»¸öÊÂÎï
+				//æ•°æ®åº“å¯åŠ¨ä¸€ä¸ªäº‹ç‰©
 				if (!transaction(db))
 				{
-					if(!Console)
-						AfxMessageBox(_T("ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"));
-					else
-						std::cout<<"ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"<<std::endl;
-
+					// æç¤ºé”™è¯¯ä¿¡æ¯
+					std::cout<<"æ— æ³•å¯åŠ¨äº‹åŠ¡å¤„ç†!"<<std::endl;
 					return false;
 				}
 
-				// ÈôÌí¼Ó²Ù×÷Ê§°Ü
-				if (sqlite3_exec(db, Add_Column_SQL, NULL, NULL, NULL) != SQLITE_OK)
+				// è‹¥æ·»åŠ æ“ä½œå¤±è´¥
+				if (sqlite3_exec(db, Add_Column_SQL.c_str(), NULL, NULL, NULL) != SQLITE_OK)
 				{
-					// ÌáÊ¾´íÎóĞÅÏ¢
-					if(!Console)
-						::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-					else
-						std::cout<<sqlite3_errmsg(db)<<std::endl;
+					// æç¤ºé”™è¯¯ä¿¡æ¯
+					std::cout<<sqlite3_errmsg(db)<<std::endl;
 
-					// ·µ»ØÌí¼ÓÊ§°Ü
-					return FALSE;
+					// è¿”å›æ·»åŠ å¤±è´¥
+					return false;
 				}
 
-				//Ìá½»ÊÂÎñ
+				//æäº¤äº‹åŠ¡
 				if (commitTransaction(db) == false)
 				{
-					// »Ø¹öÊÂÎñ
+					// å›æ»šäº‹åŠ¡
 					rollbackTransaction(db);
 
-					// ÌáÊ¾´íÎóĞÅÏ¢
-					if(!Console)
-						AfxMessageBox(_T("ÏòÊı¾İ±íÖĞÌí¼ÓÁĞÊ§°Ü: ") + (CString)sqlite3_errmsg(db));
-					else
-						std::cout<<"ÏòÊı¾İ±íÖĞÌí¼ÓÁĞÊ§°Ü: "<<sqlite3_errmsg(db)<<std::endl;
+					// æç¤ºé”™è¯¯ä¿¡æ¯
+					std::cout<<"å‘æ•°æ®è¡¨ä¸­æ·»åŠ åˆ—å¤±è´¥: "<<sqlite3_errmsg(db)<<std::endl;
 
-					// ·µ»ØÌí¼ÓÊ§°Ü
-					return FALSE;
+					// è¿”å›æ·»åŠ å¤±è´¥
+					return false;
 				}
 
-				// ·µ»ØÌí¼Ó³É¹¦
+				// è¿”å›æ·»åŠ æˆåŠŸ
 				else
-					return TRUE;
+					return true;
 			}
 			catch (...)
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					AfxMessageBox(_T("ÏòÊı¾İ±íÖĞÌí¼ÓÁĞÊ§°Ü!"));
-				else
-					std::cout<<"ÏòÊı¾İ±íÖĞÌí¼ÓÁĞÊ§°Ü!"<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<"å‘æ•°æ®è¡¨ä¸­æ·»åŠ åˆ—å¤±è´¥!"<<std::endl;
 
-				// ·µ»ØÌí¼ÓÊ§°Ü
-				return FALSE;
+				// è¿”å›æ·»åŠ å¤±è´¥
+				return false;
 			}
 
 		}break;
 
-		// É¾³ıÁĞ
+		// åˆ é™¤åˆ—
 		case DEL_COLUMN:
 		{
 			try
 			{
-				// µÃµ½ËùÓĞÁĞÃû
-				CString ColumnName;
+				// å¾—åˆ°æ‰€æœ‰åˆ—å
+				string ColumnName, params = "," + Params + ",";
 				GetColName(TableName, ColumnName);
 
-				// ÈôÕÒ²»µ½Ä¿±êÁĞ
-				if (!ColumnName.Replace(Params + _T(";"), _T("")))
+				// è‹¥æ‰¾ä¸åˆ°ç›®æ ‡åˆ—
+				if (!strstr(ColumnName.c_str(), Params.c_str()))
 				{
-					// ÌáÊ¾´íÎóĞÅÏ¢
-					if(!Console)
-						AfxMessageBox(_T("ÕÒ²»µ½Ä¿±êÁĞ£¬É¾³ıÊ§°Ü!"));
-					else
-						std::cout<<"ÕÒ²»µ½Ä¿±êÁĞ£¬É¾³ıÊ§°Ü!"<<std::endl;
+					// æç¤ºé”™è¯¯ä¿¡æ¯
+					std::cout<<"æ‰¾ä¸åˆ°ç›®æ ‡åˆ—ï¼Œåˆ é™¤å¤±è´¥!"<<std::endl;
 
-					// ·µ»ØÉ¾³ıÊ§°Ü
-					return FALSE;
-
+					// è¿”å›åˆ é™¤å¤±è´¥
+					return false;
 				}
 				else
 				{
-					// ÈôÎŞ·¨·ÖÎöÄ¿±êÁĞµÄÊı¾İ
-					if (!ColumnName.Replace(_T(";"), _T(",")))
+					// è‹¥æ— æ³•åˆ†æç›®æ ‡åˆ—çš„æ•°æ®
+					if (Replace((char*)ColumnName.c_str(), ";", ",") == "")
 					{
-						// ÌáÊ¾´íÎóĞÅÏ¢
-						if(!Console)
-							AfxMessageBox(_T("ÎŞ·¨·ÖÎöÄ¿±êÁĞ£¬É¾³ıÊ§°Ü!"));
-						else
-							std::cout<<"ÎŞ·¨·ÖÎöÄ¿±êÁĞ£¬É¾³ıÊ§°Ü!"<<std::endl;
+						// æç¤ºé”™è¯¯ä¿¡æ¯
+						std::cout<<"æ— æ³•åˆ†æç›®æ ‡åˆ—ï¼Œåˆ é™¤å¤±è´¥!"<<std::endl;
 
-						// ·µ»ØÉ¾³ıÊ§°Ü
-						return FALSE;
+						// è¿”å›åˆ é™¤å¤±è´¥
+						return false;
 					}
 					else
 					{
-						// ÅĞ¶ÏÄ©Î²ÊÇ·ñÎª , 
-						if (ColumnName.Right(1) == _T(","))
-						{
-							// É¾µôÄ©Î²µÄ ,
-							ColumnName = ColumnName.Left(ColumnName.GetLength() - 1);
-						}
+						//åˆå§‹åŒ–SQLè¯­å¥
+						string Cre_Column_SQL = "Create Table Temp As Select " + ColumnName + " From " + TableName + ";";
 
-						// ³õÊ¼»¯SQLÓï¾ä
-						CStringA Cre_Column_SQL = "Create Table Temp As Select "+ (CStringA)ColumnName +" From " + (CStringA)TableName + ";";
+						// å»æ‰ç›®æ ‡åˆ—
+					    Replace((char*)Cre_Column_SQL.c_str(), (char*)params.c_str(), "");
 
-						//Êı¾İ¿âÆô¶¯Ò»¸öÊÂÎï
+						//æ•°æ®åº“å¯åŠ¨ä¸€ä¸ªäº‹ç‰©
 						if (!transaction(db))
 						{
-							if(!Console)
-								AfxMessageBox(_T("ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"));
-							else
-								std::cout<<"ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"<<std::endl;
-
+							// æç¤ºé”™è¯¯ä¿¡æ¯
+							std::cout<<"æ— æ³•å¯åŠ¨äº‹åŠ¡å¤„ç†!"<<std::endl;
 							return false;
 						}
 
-						// ÈôÉ¾³ı²Ù×÷Ê§°Ü
-						if (sqlite3_exec(db, Cre_Column_SQL, NULL, NULL, NULL) != SQLITE_OK)
+						// è‹¥åˆ›å»ºæ“ä½œå¤±è´¥
+						if (sqlite3_exec(db, Cre_Column_SQL.c_str(), NULL, NULL, NULL) != SQLITE_OK)
 						{
-							// ÌáÊ¾´íÎóĞÅÏ¢
-							if(!Console)
-								::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-							else
-								std::cout<<sqlite3_errmsg(db)<<std::endl;
+							// æç¤ºé”™è¯¯ä¿¡æ¯
+							std::cout<<sqlite3_errmsg(db)<<std::endl;
 
-							// ·µ»ØÉ¾³ıÊ§°Ü
-							return FALSE;
+							// è¿”å›æ“ä½œå¤±è´¥
+							return false;
 						}
 
-						//Ìá½»ÊÂÎñ
+						//æäº¤äº‹åŠ¡
 						if (commitTransaction(db) == false)
 						{
-							// »Ø¹öÊÂÎñ
+							// å›æ»šäº‹åŠ¡
 							rollbackTransaction(db);
 
-							// ÌáÊ¾´íÎóĞÅÏ¢
-							if(!Console)
-								AfxMessageBox(_T("´ÓÊı¾İ±íÖĞÉ¾³ıÁĞÊ§°Ü: ") + (CString)sqlite3_errmsg(db));
-							else
-								std::cout<<"´ÓÊı¾İ±íÖĞÉ¾³ıÁĞÊ§°Ü: "<<sqlite3_errmsg(db)<<std::endl;
+							// æç¤ºé”™è¯¯ä¿¡æ¯
+							std::cout<<"ä»æ•°æ®è¡¨ä¸­åˆ é™¤åˆ—å¤±è´¥: "<<sqlite3_errmsg(db)<<std::endl;
 
-							// ·µ»ØÉ¾³ıÊ§°Ü
-							return FALSE;
+							// è¿”å›åˆ é™¤å¤±è´¥
+							return false;
 						}
 						else
 						{
-							// É¾³ıÔ­Êı¾İ±í
+							// åˆ é™¤åŸæ•°æ®è¡¨
 							if (!DeleteDataTable(TableName))
 							{
-								// ÌáÊ¾´íÎóĞÅÏ¢
-								if(!Console)
-									::MessageBox(NULL, _T("ÎŞ·¨É¾³ıÔ­Êı¾İ±í!"), NULL, NULL);
-								else
-									std::cout<<"ÎŞ·¨É¾³ıÔ­Êı¾İ±í!"<<std::endl;
+								// æç¤ºé”™è¯¯ä¿¡æ¯
+								std::cout<<"æ— æ³•åˆ é™¤åŸæ•°æ®è¡¨!"<<std::endl;
 
-								// ·µ»ØÉ¾³ıÊ§°Ü
-								return FALSE;
+								// è¿”å›åˆ é™¤å¤±è´¥
+								return false;
 							}
 							else
 							{
-								// ÈôÖØÃüÃû Temp ±íÎªÄ¿±êÊı¾İ±íÊ§°Ü
-								if (!UpdataDataTable(_T("Temp"), REN_TABLE, TableName))
+								// è‹¥é‡å‘½å Temp è¡¨ä¸ºç›®æ ‡æ•°æ®è¡¨å¤±è´¥
+								if (!UpdataDataTable("Temp", REN_TABLE, TableName))
 								{
-									// ÌáÊ¾´íÎóĞÅÏ¢
-									if(!Console)
-										::MessageBox(NULL, _T("ÎŞ·¨É¾³ıÔ­Êı¾İ±í!"), NULL, NULL);
-									else
-										std::cout<<"ÎŞ·¨É¾³ıÔ­Êı¾İ±í!"<<std::endl;
+									// æç¤ºé”™è¯¯ä¿¡æ¯
+									std::cout<<"æ— æ³•é‡å‘½åTempæ•°æ®è¡¨!"<<std::endl;
 
-									// ·µ»ØÉ¾³ıÊ§°Ü
-									return FALSE;
+									// è¿”å›åˆ é™¤å¤±è´¥
+									return false;
 								}
 								else
 								{
-									// ·µ»ØÉ¾³ıÄ¿±êÁĞ³É¹¦
-									return TRUE;
+									// è¿”å›åˆ é™¤ç›®æ ‡åˆ—æˆåŠŸ
+									return true;
 								}
 							}
 						}
@@ -2004,152 +1495,136 @@ BOOL CSqliteManager::UpdataDataTable(CString TableName, int Operation, CString P
 			}
 			catch (...)
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					AfxMessageBox(_T("´ÓÊı¾İ±íÖĞÉ¾³ıÁĞÊ§°Ü!"));
-				else
-					std::cout<<"´ÓÊı¾İ±íÖĞÉ¾³ıÁĞÊ§°Ü!"<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<"ä»æ•°æ®è¡¨ä¸­åˆ é™¤åˆ—å¤±è´¥!"<<std::endl;
 
-				// ·µ»ØÉ¾³ıÊ§°Ü
-				return FALSE;
+				// è¿”å›åˆ é™¤å¤±è´¥
+				return false;
 			}
 
 		}break;
 
-		// ÖØÃüÃûÁĞ
+		// é‡å‘½ååˆ—
 		case REN_COLUMN:
 		{
 			try
 			{
-				// µÃµ½Ä¿±êÊı¾İ±íµÄSQLÊı¾İ
-				CString Sql_Data;
-				GetTableData(TableName, Sql_Data);
+				// å¾—åˆ°ç›®æ ‡æ•°æ®è¡¨çš„SQLæ•°æ®
+				string TableData;
+				GetTableData(TableName, TableData);
 
-				// ÈôÕÒ²»µ½Ä¿±ê±í
-				if (!Sql_Data.Replace(TableName, _T("Temp")))
+				// è‹¥æ‰¾ä¸åˆ°ç›®æ ‡è¡¨
+				if (Replace((char*)TableData.c_str(), (char*)TableName.c_str(), "Temp") == "")
 				{
-					// ÌáÊ¾´íÎóĞÅÏ¢
-					if(!Console)
-						AfxMessageBox(_T("ÕÒ²»µ½Ä¿±ê±í£¬ĞŞ¸ÄÊ§°Ü!"));
-					else
-						std::cout<<"ÕÒ²»µ½Ä¿±ê±í£¬ĞŞ¸ÄÊ§°Ü!"<<std::endl;
+					// æç¤ºé”™è¯¯ä¿¡æ¯
+					std::cout<<"æ‰¾ä¸åˆ°ç›®æ ‡è¡¨ï¼Œä¿®æ”¹å¤±è´¥!"<<std::endl;
 
-					// ·µ»ØĞŞ¸ÄÊ§°Ü
-					return FALSE;
+					// è¿”å›ä¿®æ”¹å¤±è´¥
+					return false;
 				}
 				else
 				{
-					// ÈôÕÒ²»µ½Ä¿±êÁĞ
-					if (!Sql_Data.Replace(Params, NewParams))
+					// è‹¥æ‰¾ä¸åˆ°ç›®æ ‡åˆ—
+					if (Replace((char*)TableData.c_str(), (char*)Params.c_str(), (char*)NewParams.c_str()) == "")
 					{
-						// ÌáÊ¾´íÎóĞÅÏ¢
-						if(!Console)
-							AfxMessageBox(_T("ÕÒ²»µ½Ä¿±êÁĞ£¬ĞŞ¸ÄÊ§°Ü!"));
-						else
-							std::cout<<"ÕÒ²»µ½Ä¿±êÁĞ£¬ĞŞ¸ÄÊ§°Ü!"<<std::endl;
+						// æç¤ºé”™è¯¯ä¿¡æ¯
+						std::cout<<"æ‰¾ä¸åˆ°ç›®æ ‡åˆ—ï¼Œä¿®æ”¹å¤±è´¥!"<<std::endl;
 
-						// ·µ»ØĞŞ¸ÄÊ§°Ü
-						return FALSE;
-					}
-
-					//Êı¾İ¿âÆô¶¯Ò»¸öÊÂÎï
-					if (!transaction(db))
-					{
-						if(!Console)
-							AfxMessageBox(_T("ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"));
-						else
-							std::cout<<"ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"<<std::endl;
-
+						// è¿”å›ä¿®æ”¹å¤±è´¥
 						return false;
 					}
 
-					// Èô´´½¨ÁÙÊ±±í Temp Ê§°Ü
-					if (sqlite3_exec(db, (CStringA)Sql_Data, NULL, NULL, NULL) != SQLITE_OK)
+					//æ•°æ®åº“å¯åŠ¨ä¸€ä¸ªäº‹ç‰©
+					if (!transaction(db))
 					{
-						// ÌáÊ¾´íÎóĞÅÏ¢
-						if(!Console)
-							::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-						else
-							std::cout<<sqlite3_errmsg(db)<<std::endl;
-
-						// ·µ»ØĞŞ¸ÄÊ§°Ü
-						return FALSE;
+						// æç¤ºé”™è¯¯ä¿¡æ¯
+						std::cout<<"æ— æ³•å¯åŠ¨äº‹åŠ¡å¤„ç†:åˆ›å»ºä¸´æ—¶æ•°æ®è¡¨!"<<std::endl;
+						return false;
 					}
 
-					//Ìá½»ÊÂÎñ
+					// è‹¥åˆ›å»ºä¸´æ—¶è¡¨ Temp å¤±è´¥
+					if (sqlite3_exec(db, TableData.c_str(), NULL, NULL, NULL) != SQLITE_OK)
+					{
+						// æç¤ºé”™è¯¯ä¿¡æ¯
+						std::cout<<sqlite3_errmsg(db)<<std::endl;
+
+						// è¿”å›ä¿®æ”¹å¤±è´¥
+						return false;
+					}
+
+					//æäº¤äº‹åŠ¡
 					if (commitTransaction(db) == false)
 					{
-						// »Ø¹öÊÂÎñ
+						// å›æ»šäº‹åŠ¡
 						rollbackTransaction(db);
 
-						// ÌáÊ¾´íÎóĞÅÏ¢
-						if(!Console)
-							AfxMessageBox(_T("ÎŞ·¨ÖØÃüÃûÔ­Êı¾İ±í: ") + (CString)sqlite3_errmsg(db));
-						else
-							std::cout<<"ÎŞ·¨ÖØÃüÃûÔ­Êı¾İ±í: "<<sqlite3_errmsg(db)<<std::endl;
+						// æç¤ºé”™è¯¯ä¿¡æ¯
+						std::cout<<"æ— æ³•åˆ›å»ºä¸´æ—¶æ•°æ®è¡¨: "<<sqlite3_errmsg(db)<<std::endl;
 
-						// ·µ»ØĞŞ¸ÄÊ§°Ü
-						return FALSE;
+						// è¿”å›ä¿®æ”¹å¤±è´¥
+						return false;
 					}
 					else
 					{
-						// µ¼ÈëÔ­±íÊı¾İ
-						CStringA Insert_Sql = "INSERT INTO Temp SELECT * FROM " + (CStringA)TableName + ";";
+						// å¯¼å…¥åŸè¡¨æ•°æ®
+						string Insert_Sql = "INSERT INTO Temp SELECT * FROM " + TableName + ";";
 
-						//Êı¾İ¿âÆô¶¯Ò»¸öÊÂÎï
+						//æ•°æ®åº“å¯åŠ¨ä¸€ä¸ªäº‹ç‰©
 						if (!transaction(db))
 						{
-							if(!Console)
-								AfxMessageBox(_T("ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"));
-							else
-								std::cout<<"ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"<<std::endl;
+							// æç¤ºé”™è¯¯ä¿¡æ¯
+							std::cout<<"æ— æ³•å¯åŠ¨äº‹åŠ¡å¤„ç†!"<<std::endl;
 							return false;
 						}
 
-						// Èôµ¼Èë²Ù×÷Ê§°Ü
-						if (sqlite3_exec(db, Insert_Sql, NULL, NULL, NULL) != SQLITE_OK)
+						// è‹¥å¯¼å…¥æ“ä½œå¤±è´¥
+						if (sqlite3_exec(db, Insert_Sql.c_str(), NULL, NULL, NULL) != SQLITE_OK)
 						{
-							// ÌáÊ¾´íÎóĞÅÏ¢
-							if(!Console)
-								::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-							else
-								std::cout<<sqlite3_errmsg(db)<<std::endl;
+							// æç¤ºé”™è¯¯ä¿¡æ¯
+							std::cout<<sqlite3_errmsg(db)<<std::endl;
 
-							// ·µ»ØĞŞ¸ÄÊ§°Ü
-							return FALSE;
+							// è¿”å›ä¿®æ”¹å¤±è´¥
+							return false;
+						}
+
+						//æäº¤äº‹åŠ¡
+						if (commitTransaction(db) == false)
+						{
+							// å›æ»šäº‹åŠ¡
+							rollbackTransaction(db);
+
+							// æç¤ºé”™è¯¯ä¿¡æ¯
+							std::cout<<"æ— æ³•å¯¼å…¥åŸæ•°æ®è¡¨æ•°æ®: "<<sqlite3_errmsg(db)<<std::endl;
+
+							// è¿”å›ä¿®æ”¹å¤±è´¥
+							return false;
 						}
 						else
 						{
-							// É¾³ıÔ­Êı¾İ±í
+							// åˆ é™¤åŸæ•°æ®è¡¨
 							if (!DeleteDataTable(TableName))
 							{
-								// ÌáÊ¾´íÎóĞÅÏ¢
-								if(!Console)
-									::MessageBox(NULL, _T("ÎŞ·¨É¾³ıÔ­Êı¾İ±í!"), NULL, NULL);
-								else
-									std::cout<<"ÎŞ·¨É¾³ıÔ­Êı¾İ±í!"<<std::endl;
+								// æç¤ºé”™è¯¯ä¿¡æ¯
+								std::cout<<"æ— æ³•åˆ é™¤åŸæ•°æ®è¡¨!"<<std::endl;
 
-								// ·µ»ØĞŞ¸ÄÊ§°Ü
-								return FALSE;
+								// è¿”å›ä¿®æ”¹å¤±è´¥
+								return false;
 							}
 							else
 							{
-								// ÈôÖØÃüÃû Temp ±íÎªÄ¿±êÊı¾İ±íÊ§°Ü
-								if (!UpdataDataTable(_T("Temp"), REN_TABLE, TableName))
+								// è‹¥é‡å‘½å Temp è¡¨ä¸ºç›®æ ‡æ•°æ®è¡¨å¤±è´¥
+								if (!UpdataDataTable("Temp", REN_TABLE, TableName))
 								{
-									// ÌáÊ¾´íÎóĞÅÏ¢
-									if(!Console)
-										::MessageBox(NULL, _T("ÎŞ·¨ÖØÃüÃûÔ­Êı¾İ±í!"), NULL, NULL);
-									else
-										std::cout<<"ÎŞ·¨ÖØÃüÃûÔ­Êı¾İ±í!"<<std::endl;
+									// æç¤ºé”™è¯¯ä¿¡æ¯
+									std::cout<<"æ— æ³•é‡å‘½ååŸæ•°æ®è¡¨!"<<std::endl;
 
-									// ·µ»ØĞŞ¸ÄÊ§°Ü
-									return FALSE;
+									// è¿”å›ä¿®æ”¹å¤±è´¥
+									return false;
 								}
 								else
 								{
-									// ·µ»ØĞŞ¸ÄÁĞ³É¹¦
-									return TRUE;
+									// è¿”å›ä¿®æ”¹åˆ—æˆåŠŸ
+									return true;
 								}
 							}
 						}
@@ -2158,908 +1633,779 @@ BOOL CSqliteManager::UpdataDataTable(CString TableName, int Operation, CString P
 			}
 			catch (...)
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					AfxMessageBox(_T("ÔÚÊı¾İ±íÖĞĞŞ¸ÄÁĞÊ§°Ü!"));
-				else
-					std::cout<<"ÔÚÊı¾İ±íÖĞĞŞ¸ÄÁĞÊ§°Ü!"<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<"åœ¨æ•°æ®è¡¨ä¸­ä¿®æ”¹åˆ—å¤±è´¥!"<<std::endl;
 
-				// ·µ»ØĞŞ¸ÄÊ§°Ü
-				return FALSE;
+				// è¿”å›ä¿®æ”¹å¤±è´¥
+				return false;
 			}
 
 		}break;
 
-		// Ä¬ÈÏÊ²Ã´Ò²²»×ö
+		// é»˜è®¤ä»€ä¹ˆä¹Ÿä¸åš
 		default:
 		{
-			if(!Console)
-				AfxMessageBox(_T("ÎŞĞ§µÄÃüÁî£¬±¾´ÎSQLÎŞ²Ù×÷!"));
-			else
-				std::cout<<"ÎŞĞ§µÄÃüÁî£¬±¾´ÎSQLÎŞ²Ù×÷!"<<std::endl;
-
+			// æç¤ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"æ— æ•ˆçš„å‘½ä»¤ï¼Œæœ¬æ¬¡SQLæ— æ“ä½œ!"<<std::endl;
 		}break;
 		}
 	}
 
-	// Ä¬ÈÏ·µ»ØĞŞ¸ÄÊ§°ÜĞÅÏ¢
-	return FALSE;
+	// é»˜è®¤è¿”å›ä¿®æ”¹å¤±è´¥ä¿¡æ¯
+	return false;
 }
 
 
-// ÔÚÄ¿±êÊı¾İ¿âÖĞ¼ì²éÊı¾İ±í     ( ¼ì²éÊı¾İ±íÊÇ·ñ´æÔÚ )
-BOOL CSqliteManager::CheckDataTable (CString TableName, bool Console)
+// åœ¨ç›®æ ‡æ•°æ®åº“ä¸­æ£€æŸ¥æ•°æ®è¡¨     ( æ£€æŸ¥æ•°æ®è¡¨æ˜¯å¦å­˜åœ¨ )
+bool CSqliteManager::CheckDataTable (string TableName)
 {
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
 	if (!IsConnect)
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"));
-		else
-			std::cout<<"Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
 
-		// ·µ»Ø¼ì²éÊ§°ÜĞÅÏ¢
-		return FALSE;
+		// è¿”å›æ£€æŸ¥å¤±è´¥ä¿¡æ¯
+		return false;
 	}
 	else
 	{
-		// ³¢ÊÔÖ´ĞĞ¼ì²éÊı¾İ±íµÄ²Ù×÷
+		// å°è¯•æ‰§è¡Œæ£€æŸ¥æ•°æ®è¡¨çš„æ“ä½œ
 		try
 		{
-			// ¶¨Òå±È¶Ô±äÁ¿
-			CString CheckName;
+			// å®šä¹‰æ¯”å¯¹å˜é‡
+			string CheckName;
 			if (!GetTableName(CheckName))
 			{
-				// µ¯³ö´íÎóĞÅÏ¢
-				if(!Console)
-					AfxMessageBox(_T("ÎŞ·¨´ÓÊı¾İ¿âÖĞ»ñµÃ±íÃû!"));
-				else
-					std::cout<<"ÎŞ·¨´ÓÊı¾İ¿âÖĞ»ñµÃ±íÃû!"<<std::endl;
+				// å¼¹å‡ºé”™è¯¯ä¿¡æ¯
+				std::cout<<"æ— æ³•ä»æ•°æ®åº“ä¸­è·å¾—è¡¨å!"<<std::endl;
 
-				// ·µ»Ø¼ì²éÊ§°Ü
-				return FALSE;
+				// è¿”å›æ£€æŸ¥å¤±è´¥
+				return false;
 			}
 			else
 			{
-				// ±È¶ÔÊÇ·ñ´æÔÚÄ¿±êÊı¾İ±í
-				if (CheckName.Replace(TableName, _T("")))
+				// æ¯”å¯¹æ˜¯å¦å­˜åœ¨ç›®æ ‡æ•°æ®è¡¨
+				if (strstr(CheckName.c_str(), TableName.c_str()))
 				{
-					// ·µ»Ø´æÔÚÄ¿±êÊı¾İ±í
-					return TRUE;
+					// è¿”å›å­˜åœ¨ç›®æ ‡æ•°æ®è¡¨
+					return true;
 				}
 				else
 				{
-					// ·µ»Ø²»´æÔÚÄ¿±êÊı¾İ±í
-					return FALSE;
+					// è¿”å›ä¸å­˜åœ¨ç›®æ ‡æ•°æ®è¡¨
+					return false;
 				}
 			}
 		}
 		catch (...)
 		{
-			if(!Console)
-				AfxMessageBox(_T("ÎŞ·¨´ÓÊı¾İ¿âÖĞ»ñµÃ±íÃû!"));
-			else
-				std::cout<<"ÎŞ·¨´ÓÊı¾İ¿âÖĞ»ñµÃ±íÃû!"<<std::endl;
+			// æç¤ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"æ— æ³•ä»æ•°æ®åº“ä¸­è·å¾—è¡¨å!"<<std::endl;
 
-			// ·µ»Ø¼ì²éÊ§°Ü
-			return FALSE;
+			// è¿”å›æ£€æŸ¥å¤±è´¥
+			return false;
 		}
 	}
 
-	// Ä¬ÈÏ·µ»Ø¼ì²éÊ§°ÜĞÅÏ¢
-	return FALSE;
+	// é»˜è®¤è¿”å›æ£€æŸ¥å¤±è´¥ä¿¡æ¯
+	return false;
 }
 
 
-// ÔÚÄ¿±êÊı¾İ¿âÖĞÍ³¼ÆÊı¾İ±í     ( Í³¼ÆÊı¾İ±í×Ü¹²ÊıÁ¿ )
-BOOL CSqliteManager::CountDataTable (int &Count, bool Console)
+// åœ¨ç›®æ ‡æ•°æ®åº“ä¸­ç»Ÿè®¡æ•°æ®è¡¨     ( ç»Ÿè®¡æ•°æ®è¡¨æ€»å…±æ•°é‡ )
+bool CSqliteManager::CountDataTable (int &Count)
 {
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
 	if (!IsConnect)
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"));
-		else
-			std::cout<<"Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
 
-		// ·µ»Ø´´½¨Ê§°ÜĞÅÏ¢
-		return FALSE;
+		// è¿”å›åˆ›å»ºå¤±è´¥ä¿¡æ¯
+		return false;
 	}
 	else
 	{
-		// ÓÃÓÚÅĞ¶Ï²Ù×÷ÊÇ·ñ³É¹¦
-		BOOL IsSuccess;
+		// ç”¨äºåˆ¤æ–­æ“ä½œæ˜¯å¦æˆåŠŸ
+		bool IsSuccess;
 
-		// ³õÊ¼»¯ÊıÁ¿
+		// åˆå§‹åŒ–æ•°é‡
 		Count = 0;
 
 
-		// ³¢ÊÔÖ´ĞĞ»ñÈ¡Êı¾İ±íµÄ²Ù×÷
+		// å°è¯•æ‰§è¡Œè·å–æ•°æ®è¡¨çš„æ“ä½œ
 		try
 		{
-			// ³õÊ¼»¯SQLÓï¾ä
-			CStringA GetSQL = "Select name,sql From sqlite_master Where type = 'table' Order By name";
+			// åˆå§‹åŒ–SQLè¯­å¥
+			string GetSQL = "Select name,sql From sqlite_master Where type = 'table' Order By name";
 
-			// Èô»ñÈ¡²Ù×÷Ê§°Ü
-			if (sqlite3_prepare(db, GetSQL, -1, &stmt, (const char**)errMsg) != SQLITE_OK)
+			// è‹¥è·å–æ“ä½œå¤±è´¥
+			if (sqlite3_prepare(db, GetSQL.c_str(), -1, &stmt, (const char**)errMsg) != SQLITE_OK)
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-				else
-					std::cout<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»Ø»ñÈ¡Ê§°Ü
-				IsSuccess = FALSE;
+				// è¿”å›è·å–å¤±è´¥
+				IsSuccess = false;
 			}
 
-			// Èô»ñÈ¡³É¹¦
+			// è‹¥è·å–æˆåŠŸ
 			else
 			{
-				// ÈôÊı¾İÎª¿Õ
+				// è‹¥æ•°æ®ä¸ºç©º
 				if (!stmt)
 				{
-					// ·µ»Ø 0 ¸öÊıÁ¿
+					// è¿”å› 0 ä¸ªæ•°é‡
 					Count = 0;
 
-					// ·µ»Ø»ñÈ¡Ê§°Ü
-					IsSuccess = FALSE;
+					// è¿”å›è·å–å¤±è´¥
+					IsSuccess = false;
 				}
 
-				// ÈôÊı¾İ²»Îª¿Õ
+				// è‹¥æ•°æ®ä¸ä¸ºç©º
 				else
 				{
-					// Ñ­»·»ñµÃÊı¾İ±í
+					// æ•°æ®åˆå§‹åŒ–
+					Count = 0;
+
+					// å¾ªç¯è·å¾—æ•°æ®è¡¨
 					while (sqlite3_step(stmt) == SQLITE_ROW)
 					{
-						// Êı¾İÊıÁ¿×Ô¼Ó1
+						// æ•°æ®æ•°é‡è‡ªåŠ 1
 						Count ++;
 					}
 
-					// ·µ»Ø»ñÈ¡³É¹¦
-					IsSuccess = TRUE;
+					// è¿”å›è·å–æˆåŠŸ
+					IsSuccess = true;
 				}
 			}
 
-			//ÊÍ·Å²éÑ¯½á¹û(ÎŞÂÛ²éÑ¯ÊÇ·ñ³É¹¦)
+			//é‡Šæ”¾æŸ¥è¯¢ç»“æœ(æ— è®ºæŸ¥è¯¢æ˜¯å¦æˆåŠŸ)
 			sqlite3_finalize(stmt);
 			stmt = NULL;
 		}
 		catch (...)
 		{
-			// µ¯³ö´íÎóĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("ÎŞ·¨´ÓÊı¾İ¿âÖĞ»ñµÃ±íÃû!"));
-			else
-				std::cout<<"ÎŞ·¨´ÓÊı¾İ¿âÖĞ»ñµÃ±íÃû!"<<std::endl;
+			// å¼¹å‡ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"æ— æ³•ä»æ•°æ®åº“ä¸­è·å¾—è¡¨å!"<<std::endl;
 
-			// ·µ»Ø 0 ¸öÊıÁ¿
+			// è¿”å› 0 ä¸ªæ•°é‡
 			Count = 0;
 
-			// ·µ»Ø»ñÈ¡Ê§°Ü
-			return FALSE;
+			// è¿”å›è·å–å¤±è´¥
+			return false;
 		}
 
-		// ·µ»Ø²Ù×÷½á¹û
+		// è¿”å›æ“ä½œç»“æœ
 		return IsSuccess;
 	}
 
-	// Ä¬ÈÏ·µ»Ø»ñÈ¡Ê§°Ü
-	return FALSE;
+	// é»˜è®¤è¿”å›è·å–å¤±è´¥
+	return false;
 }
 
 
-// ÏòÄ¿±êÊı¾İ¿âÖĞµ¼ÈëÊı¾İ±í
-BOOL CSqliteManager::ImportDataTable(CString TableName, CString TargetDataBase, bool Console)
+// ä»ç›®æ ‡æ•°æ®åº“ä¸­å¯¼å…¥æ•°æ®è¡¨ ()
+bool CSqliteManager::ImportDataTable(string TableName, string TargetDataBase)
 {
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
-	if (!IsConnect)
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
+	/*if (!IsConnect)
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"));
-		else
-			std::cout<<"Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
 
-		// ·µ»Ø´´½¨Ê§°ÜĞÅÏ¢
-		return FALSE;
+		// è¿”å›åˆ›å»ºå¤±è´¥ä¿¡æ¯
+		return false;
 	}
 	else
 	{
-		// ÓÃÓÚÅĞ¶Ï²Ù×÷ÊÇ·ñ³É¹¦
-		//BOOL IsSuccess;
+		// ç”¨äºåˆ¤æ–­æ“ä½œæ˜¯å¦æˆåŠŸ
+		//bool IsSuccess;
 
 		sqlite3 *pTarget;
 
-		// ²éÕÒÄ¿±êÊı¾İ¿âÊÇ·ñ´æÔÚ
-		CFileFind Finder;
-		BOOL Status = Finder.FindFile(TargetDataBase);
-
-		// Èô´æÔÚÄ¿±êÊı¾İ¿âÔò³¢ÊÔÁ¬½ÓÄ¿±êÊı¾İ¿â
-		if (Status)
+		// å°è¯•è¿æ¥ç›®æ ‡æ•°æ®åº“
+		try
 		{
-			// ³¢ÊÔÁ¬½ÓÄ¿±êÊı¾İ¿â
-			try
+			// åˆ›å»ºå¹¶æ‰“å¼€ç›®æ ‡æ•°æ®åº“
+			if (sqlite3_open(TargetDataBase.c_str(), &pTarget) != SQLITE_OK) // è‹¥æ— æ³•è¿æ¥æ•°æ®åº“
 			{
-				// ´´½¨²¢´ò¿ªÄ¿±êÊı¾İ¿â
-				if (sqlite3_open((CStringA)TargetDataBase, &pTarget) != SQLITE_OK) // ÈôÎŞ·¨Á¬½ÓÊı¾İ¿â
+				// å¼¹å‡ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(pTarget)<<std::endl;
+
+				// è‹¥å…³é—­æ•°æ®åº“å¤±è´¥
+				if (sqlite3_close(pTarget) != SQLITE_OK)
 				{
-					// µ¯³ö´íÎóĞÅÏ¢
-					if(!Console)
-						::MessageBox(NULL, (CString)sqlite3_errmsg(pTarget), NULL, NULL);
-					else
-						std::cout<<sqlite3_errmsg(pTarget)<<std::endl;
+					// æç¤ºé”™è¯¯ä¿¡æ¯
+					std::cout<<sqlite3_errmsg(pTarget)<<std::endl;
 
-					// Èô¹Ø±ÕÊı¾İ¿âÊ§°Ü
-					if (sqlite3_close(pTarget) != SQLITE_OK)
-					{
-						// ÌáÊ¾´íÎóĞÅÏ¢
-						if(!Console)
-							::MessageBox(NULL, (CString)sqlite3_errmsg(pTarget), NULL, NULL);
-						else
-							std::cout<<sqlite3_errmsg(pTarget)<<std::endl;
-
-						// ·µ»Ø¹Ø±ÕÊ§°ÜĞÅÏ¢
-						return FALSE;
-					}
-
-					// ·µ»ØÊı¾İ¿âÁ¬½ÓÊ§°ÜµÄĞÅÏ¢
-					return FALSE;
+					// è¿”å›å…³é—­å¤±è´¥ä¿¡æ¯
+					return false;
 				}
 
-				// ÈôÊı¾İ¿â³É¹¦Á¬½Ó
-				else
-				{
-					try
-					{
-						// ¼ì²éÊı¾İ±íÊÇ·ñ´æÔÚ
-						if (CheckDataTable(TableName))
-						{
-							//Êı¾İ¿âÆô¶¯Ò»¸öÊÂÎï
-							if (!transaction(db))
-							{
-								if(!Console)
-									AfxMessageBox(_T("ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"));
-								else
-									std::cout<<"ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"<<std::endl;
-
-								return false;
-							}
-
-							// ³õÊ¼»¯SQLÓï¾ä
-							CStringA InsertSQL;//"INSERT INTO " + (CStringA)TableName + " VALUES( " + (CStringA)Params + " );";
-
-							// ÈôÌí¼Ó²Ù×÷Ê§°Ü
-							if (sqlite3_exec(db, InsertSQL, NULL, NULL, &errMsg) != SQLITE_OK)
-							{
-								// ÌáÊ¾´íÎóĞÅÏ¢
-								if(!Console)
-									::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-								else
-									std::cout<<sqlite3_errmsg(db)<<std::endl;
-
-								// ·µ»ØÌí¼ÓÊ§°ÜĞÅÏ¢
-								return FALSE;
-							}
-
-							//Ìá½»ÊÂÎñ
-							if (commitTransaction(db) == false)
-							{
-								// »Ø¹öÊÂÎñ
-								rollbackTransaction(db);
-
-								// ÌáÊ¾´íÎóĞÅÏ¢
-								if(!Console)
-									AfxMessageBox(_T("Ìí¼ÓÊı¾İ²Ù×÷Ê§°Ü: ") + (CString)sqlite3_errmsg(db));
-								else
-									std::cout<<"Ìí¼ÓÊı¾İ²Ù×÷Ê§°Ü:"<<sqlite3_errmsg(db)<<std::endl;
-
-								// ·µ»ØÌí¼ÓÊ§°ÜĞÅÏ¢
-								return FALSE;
-							}
-
-						}
-						else
-						{
-							// µ¯³ö´íÎóĞÅÏ¢
-							if(!Console)
-								::MessageBox(NULL, _T("Ä¿±êÊı¾İ±í²»´æÔÚ,ÎŞ·¨µ¼ÈëÊı¾İ!"), NULL, NULL);
-							else
-								std::cout<<"Ä¿±êÊı¾İ±í²»´æÔÚ,ÎŞ·¨µ¼ÈëÊı¾İ!"<<std::endl;
-
-							// ·µ»ØÊı¾İµ¼ÈëÊ§°ÜµÄĞÅÏ¢
-							return FALSE;
-						}
-					}
-					// ²¶×½´íÎó
-					catch (...)
-					{
-						// µ¯³ö´íÎóĞÅÏ¢
-						if(!Console)
-							::MessageBox(NULL, _T("ÎŞ·¨µ¼ÈëÊı¾İµ½Ä¿±êÊı¾İ¿â!"), NULL, NULL);
-						else
-							std::cout<<"ÎŞ·¨µ¼ÈëÊı¾İµ½Ä¿±êÊı¾İ¿â!"<<std::endl;
-
-						// ·µ»ØÊı¾İµ¼ÈëÊ§°ÜµÄĞÅÏ¢
-						return FALSE;
-					}
-				}
+				// è¿”å›æ•°æ®åº“è¿æ¥å¤±è´¥çš„ä¿¡æ¯
+				return false;
 			}
-			// ²¶×½´íÎó
-			catch (...)
-			{
-				// µ¯³ö´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, _T("ÎŞ·¨Á¬½Óµ½Ä¿±êÊı¾İ¿â!"), NULL, NULL);
-				else
-					std::cout<<"ÎŞ·¨Á¬½Óµ½Ä¿±êÊı¾İ¿â!"<<std::endl;
 
-				// ·µ»ØÊı¾İ¿âÁ¬½ÓÊ§°ÜµÄĞÅÏ¢
-				return FALSE;
-			}
-		}
-		else
-		{
-			// µ¯³ö´íÎóĞÅÏ¢
-			if(!Console)
-				::MessageBox(NULL, _T("ÎŞ·¨Á¬½Óµ½Ä¿±êÊı¾İ¿â, ÒòÎªÄ¿±êÊı¾İ¿â²»´æÔÚ!"), NULL, NULL);
+			// è‹¥æ•°æ®åº“æˆåŠŸè¿æ¥
 			else
-				std::cout<<"ÎŞ·¨Á¬½Óµ½Ä¿±êÊı¾İ¿â, ÒòÎªÄ¿±êÊı¾İ¿â²»´æÔÚ!"<<std::endl;
+			{
+				try
+				{
+					// æ£€æŸ¥æ•°æ®è¡¨æ˜¯å¦å­˜åœ¨
+					if (CheckDataTable(TableName))
+					{
+						//æ•°æ®åº“å¯åŠ¨ä¸€ä¸ªäº‹ç‰©
+						if (!transaction(db))
+						{
+							// æç¤ºé”™è¯¯ä¿¡æ¯
+							std::cout<<"æ— æ³•å¯åŠ¨äº‹åŠ¡å¤„ç†!"<<std::endl;
+							return false;
+						}
 
-			// ·µ»ØÊı¾İ¿âÁ¬½ÓÊ§°ÜµÄĞÅÏ¢
-			return FALSE;
+						// åˆå§‹åŒ–SQLè¯­å¥
+						string InsertSQL;//"INSERT INTO " + TableName + " VALUES( " + Params + " );";
+
+						// è‹¥æ·»åŠ æ“ä½œå¤±è´¥
+						if (sqlite3_exec(db, InsertSQL.c_str(), NULL, NULL, &errMsg) != SQLITE_OK)
+						{
+							// æç¤ºé”™è¯¯ä¿¡æ¯
+							std::cout<<sqlite3_errmsg(db)<<std::endl;
+
+							// è¿”å›æ·»åŠ å¤±è´¥ä¿¡æ¯
+							return false;
+						}
+
+						//æäº¤äº‹åŠ¡
+						if (commitTransaction(db) == false)
+						{
+							// å›æ»šäº‹åŠ¡
+							rollbackTransaction(db);
+
+							// æç¤ºé”™è¯¯ä¿¡æ¯
+							std::cout<<"æ·»åŠ æ•°æ®æ“ä½œå¤±è´¥:"<<sqlite3_errmsg(db)<<std::endl;
+
+							// è¿”å›æ·»åŠ å¤±è´¥ä¿¡æ¯
+							return false;
+						}
+
+					}
+					else
+					{
+						// å¼¹å‡ºé”™è¯¯ä¿¡æ¯
+						std::cout<<"ç›®æ ‡æ•°æ®è¡¨ä¸å­˜åœ¨,æ— æ³•å¯¼å…¥æ•°æ®!"<<std::endl;
+
+						// è¿”å›æ•°æ®å¯¼å…¥å¤±è´¥çš„ä¿¡æ¯
+						return false;
+					}
+				}
+				// æ•æ‰é”™è¯¯
+				catch (...)
+				{
+					// å¼¹å‡ºé”™è¯¯ä¿¡æ¯
+					std::cout<<"æ— æ³•å¯¼å…¥æ•°æ®åˆ°ç›®æ ‡æ•°æ®åº“!"<<std::endl;
+
+					// è¿”å›æ•°æ®å¯¼å…¥å¤±è´¥çš„ä¿¡æ¯
+					return false;
+				}
+			}
+		}
+		// æ•æ‰é”™è¯¯
+		catch (...)
+		{
+			// å¼¹å‡ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"æ— æ³•è¿æ¥åˆ°ç›®æ ‡æ•°æ®åº“!"<<std::endl;
+
+			// è¿”å›æ•°æ®åº“è¿æ¥å¤±è´¥çš„ä¿¡æ¯
+			return false;
 		}
 
-		// Ä¬ÈÏ·µ»Øµ¼ÈëÊ§°Ü
-		return FALSE;
-	}
+		// æŸ¥æ‰¾ç›®æ ‡æ•°æ®åº“æ˜¯å¦å­˜åœ¨
+		//CFileFind Finder;
+		//BOOL Status = Finder.FindFile(TargetDataBase);
+
+		//// è‹¥å­˜åœ¨ç›®æ ‡æ•°æ®åº“åˆ™å°è¯•è¿æ¥ç›®æ ‡æ•°æ®åº“
+		//if (Status)
+		//{
+		//	
+		//}
+		//else
+		//{
+		//	// å¼¹å‡ºé”™è¯¯ä¿¡æ¯
+		//	std::cout<<"æ— æ³•è¿æ¥åˆ°ç›®æ ‡æ•°æ®åº“, å› ä¸ºç›®æ ‡æ•°æ®åº“ä¸å­˜åœ¨!"<<std::endl;
+
+		//	// è¿”å›æ•°æ®åº“è¿æ¥å¤±è´¥çš„ä¿¡æ¯
+		//	return false;
+		//}
+	}*/
+
+    // é»˜è®¤è¿”å›å¯¼å…¥å¤±è´¥
+	return false;
 }
 
 
-// ´ÓÄ¿±êÊı¾İ¿âÖĞµ¼³öÊı¾İ±í
-BOOL CSqliteManager::ExportDataTable(CString TableName, CString TargetDataBase, bool Console)
+// å‘ç›®æ ‡æ•°æ®åº“ä¸­å¯¼å‡ºæ•°æ®è¡¨
+bool CSqliteManager::ExportDataTable(string TableName, string TargetDataBase)
 {
 	return true;
 }
 
 
-///////////////////////////////////Êı¾İÏî²Ù×÷´úÂë/////////////////////////////////////
+///////////////////////////////////æ•°æ®é¡¹æ“ä½œä»£ç /////////////////////////////////////
 
 
-// ÏòÄ¿±êÊı¾İ±íÖĞÌí¼ÓÊı¾İÏî
-BOOL CSqliteManager::InsertData(CString TableName, CString Params, bool Console)
+// å‘ç›®æ ‡æ•°æ®è¡¨ä¸­æ·»åŠ æ•°æ®é¡¹
+bool CSqliteManager::InsertData(string TableName, string Params)
 {
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
 	if (!IsConnect)
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"));
-		else
-			std::cout<<"Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
 
-		// ·µ»ØÌí¼ÓÊ§°ÜĞÅÏ¢
-		return FALSE;
+		// è¿”å›æ·»åŠ å¤±è´¥ä¿¡æ¯
+		return false;
 	}
 	else
 	{
-		// ³¢ÊÔÖ´ĞĞÌí¼ÓÊı¾İµÄ²Ù×÷
+		// å°è¯•æ‰§è¡Œæ·»åŠ æ•°æ®çš„æ“ä½œ
 		try
 		{
-			// ³õÊ¼»¯SQLÓï¾ä
-			CStringA InsertSQL = "INSERT INTO " + (CStringA)TableName + " VALUES( " + (CStringA)Params + " );";
+			// åˆå§‹åŒ–SQLè¯­å¥
+			string InsertSQL = "INSERT INTO " + TableName + " VALUES( " + Params + " );";
 
-			//Êı¾İ¿âÆô¶¯Ò»¸öÊÂÎï
+			//æ•°æ®åº“å¯åŠ¨ä¸€ä¸ªäº‹ç‰©
 			if (!transaction(db))
 			{
-				if(!Console)
-					AfxMessageBox(_T("ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"));
-				else
-					std::cout<<"ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"<<std::endl;
+				std::cout<<"æ— æ³•å¯åŠ¨äº‹åŠ¡å¤„ç†!"<<std::endl;
 
 				return false;
 			}
 
-			// ÈôÌí¼Ó²Ù×÷Ê§°Ü
-			if (sqlite3_exec(db, InsertSQL, NULL, NULL, &errMsg) != SQLITE_OK)
+			// è‹¥æ·»åŠ æ“ä½œå¤±è´¥
+			if (sqlite3_exec(db, InsertSQL.c_str(), NULL, NULL, &errMsg) != SQLITE_OK)
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-				else
-					std::cout<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»ØÌí¼ÓÊ§°ÜĞÅÏ¢
-				return FALSE;
+				// è¿”å›æ·»åŠ å¤±è´¥ä¿¡æ¯
+				return false;
 			}
 
-			//Ìá½»ÊÂÎñ
+			//æäº¤äº‹åŠ¡
 			if (commitTransaction(db) == false)
 			{
-				// »Ø¹öÊÂÎñ
+				// å›æ»šäº‹åŠ¡
 				rollbackTransaction(db);
 
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					AfxMessageBox(_T("Ìí¼ÓÊı¾İ²Ù×÷Ê§°Ü: ") + (CString)sqlite3_errmsg(db));
-				else
-					std::cout<<"Ìí¼ÓÊı¾İ²Ù×÷Ê§°Ü: "<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<"æ·»åŠ æ•°æ®æ“ä½œå¤±è´¥: "<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»ØÌí¼ÓÊ§°ÜĞÅÏ¢
-				return FALSE;
+				// è¿”å›æ·»åŠ å¤±è´¥ä¿¡æ¯
+				return false;
 			}
 
-			// ·µ»ØÌí¼Ó³É¹¦ĞÅÏ¢
+			// è¿”å›æ·»åŠ æˆåŠŸä¿¡æ¯
 			else
-				return TRUE;
+				return true;
 		}
 		catch (...)
 		{
-			// ÌáÊ¾´íÎóĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("Ìí¼ÓÊı¾İ²Ù×÷Ê§°Ü!"));
-			else
-				std::cout<<"Ìí¼ÓÊı¾İ²Ù×÷Ê§°Ü!"<<std::endl;
+			// æç¤ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"æ·»åŠ æ•°æ®æ“ä½œå¤±è´¥!"<<std::endl;
 
-			// ·µ»ØÌí¼ÓÊ§°ÜĞÅÏ¢
-			return FALSE;
+			// è¿”å›æ·»åŠ å¤±è´¥ä¿¡æ¯
+			return false;
 		}
 	}
 
-	// Ä¬ÈÏ·µ»ØÌí¼ÓÊ§°ÜĞÅÏ¢
-	return FALSE;
+	// é»˜è®¤è¿”å›æ·»åŠ å¤±è´¥ä¿¡æ¯
+	return false;
 }
 
 
-// ´ÓÄ¿±êÊı¾İ±íÖĞÉ¾³ıÊı¾İÏî
-BOOL CSqliteManager::DeleteData(CString TableName, CString Params, bool Console)
+// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­åˆ é™¤æ•°æ®é¡¹
+bool CSqliteManager::DeleteData(string TableName, string Params)
 {
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
 	if (!IsConnect)
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"));
-		else
-			std::cout<<"Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
 
-		// ·µ»ØÉ¾³ıÊ§°ÜĞÅÏ¢
-		return FALSE;
+		// è¿”å›åˆ é™¤å¤±è´¥ä¿¡æ¯
+		return false;
 	}
 	else
 	{
-		// ³¢ÊÔÖ´ĞĞ´ÓÊı¾İ±íÖĞÉ¾³ıÊı¾İµÄ²Ù×÷
+		// å°è¯•æ‰§è¡Œä»æ•°æ®è¡¨ä¸­åˆ é™¤æ•°æ®çš„æ“ä½œ
 		try
 		{
-			// ³õÊ¼»¯SQLÓï¾ä
-			CStringA DeleteSQL;
-			if (!Params.IsEmpty())
-				DeleteSQL = "Delete From " + (CStringA)TableName + " Where " + (CStringA)Params + ";";
+			// åˆå§‹åŒ–SQLè¯­å¥
+			string DeleteSQL;
+			if (!Params.empty())
+				DeleteSQL = "Delete From " + TableName + " Where " + Params + ";";
 			else
-				DeleteSQL = "Delete From " + (CStringA)TableName + ";";
+				DeleteSQL = "Delete From " + TableName + ";";
 
-			//Êı¾İ¿âÆô¶¯Ò»¸öÊÂÎï
+			//æ•°æ®åº“å¯åŠ¨ä¸€ä¸ªäº‹ç‰©
 			if (!transaction(db))
 			{
-				if(!Console)
-					AfxMessageBox(_T("ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"));
-				else
-					std::cout<<"ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"<<std::endl;
+				std::cout<<"æ— æ³•å¯åŠ¨äº‹åŠ¡å¤„ç†!"<<std::endl;
 
 				return false;
 			}
 
-			// ÈôÉ¾³ı²Ù×÷Ê§°Ü
-			if (sqlite3_exec(db, DeleteSQL, NULL, NULL, &errMsg) != SQLITE_OK)
+			// è‹¥åˆ é™¤æ“ä½œå¤±è´¥
+			if (sqlite3_exec(db, DeleteSQL.c_str(), NULL, NULL, &errMsg) != SQLITE_OK)
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-				else
-					std::cout<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»ØÉ¾³ıÊ§°Ü
-				return FALSE;
+				// è¿”å›åˆ é™¤å¤±è´¥
+				return false;
 			}
 
-			//Ìá½»ÊÂÎñ
+			//æäº¤äº‹åŠ¡
 			if (commitTransaction(db) == false)
 			{
-				// »Ø¹öÊÂÎñ
+				// å›æ»šäº‹åŠ¡
 				rollbackTransaction(db);
 
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					AfxMessageBox(_T("Ìí¼ÓÊı¾İ²Ù×÷Ê§°Ü: ") + (CString)sqlite3_errmsg(db));
-				else
-					std::cout<<"Ìí¼ÓÊı¾İ²Ù×÷Ê§°Ü: "<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<"æ·»åŠ æ•°æ®æ“ä½œå¤±è´¥: "<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»ØÉ¾³ıÊ§°Ü
-				return FALSE;
+				// è¿”å›åˆ é™¤å¤±è´¥
+				return false;
 			}
 
-			// ·µ»ØÉ¾³ı³É¹¦
+			// è¿”å›åˆ é™¤æˆåŠŸ
 			else
-				return TRUE;
+				return true;
 		}
 		catch (...)
 		{
-			// ÌáÊ¾´íÎóĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("É¾³ıÊı¾İÊ§°Ü!"));
-			else
-				std::cout<<"É¾³ıÊı¾İÊ§°Ü!"<<std::endl;
+			// æç¤ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"åˆ é™¤æ•°æ®å¤±è´¥!"<<std::endl;
 
-			// ·µ»ØÉ¾³ıÊ§°Ü
-			return FALSE;
+			// è¿”å›åˆ é™¤å¤±è´¥
+			return false;
 		}
 	}
 }
 
 
-// ´ÓÄ¿±êÊı¾İ±íÖĞĞŞ¸ÄÊı¾İÏî
-BOOL CSqliteManager::UpdataData(CString TableName, CString Column, CString NewData, CString Params, bool Console)
+// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­ä¿®æ”¹æ•°æ®é¡¹
+bool CSqliteManager::UpdataData(string TableName, string Column, string NewData, string Params)
 {
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
 	if (!IsConnect)
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"));
-		else
-			std::cout<<"Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
 
-		// ·µ»ØĞŞ¸ÄÊ§°ÜĞÅÏ¢
-		return FALSE;
+		// è¿”å›ä¿®æ”¹å¤±è´¥ä¿¡æ¯
+		return false;
 	}
 	else
 	{
-		// ³¢ÊÔÖ´ĞĞĞŞ¸ÄÊı¾İµÄ²Ù×÷
+		// å°è¯•æ‰§è¡Œä¿®æ”¹æ•°æ®çš„æ“ä½œ
 		try
 		{
-			// ³õÊ¼»¯SQLÓï¾ä
-			CStringA UpData_SQL;
+			// åˆå§‹åŒ–SQLè¯­å¥
+			string UpData_SQL;
 
-			// Èô²ÎÊıÎª¿Õ
-			if (Params.IsEmpty())
+			// è‹¥å‚æ•°ä¸ºç©º
+			if (Params.empty())
 			{
-				UpData_SQL = _T("UPDATE ") + TableName + _T(" SET ") + Column + _T(" = ") + _T("'") + NewData + _T("'") + _T(";");
+				UpData_SQL = "UPDATE " + TableName + " SET " + Column + " = " + "'" + NewData + "'" + ";";
 			}
 			else
 			{
-				UpData_SQL = _T("UPDATE ") + TableName + _T(" SET ") + Column + _T(" = ") + _T("'") + NewData + _T("'") + _T(" Where ") + Params + _T(";");
+				UpData_SQL = "UPDATE " + TableName + " SET " + Column + " = " + "'" + NewData + "'" + " Where " + Params + ";";
 			}
 			
-			//Êı¾İ¿âÆô¶¯Ò»¸öÊÂÎï
+			//æ•°æ®åº“å¯åŠ¨ä¸€ä¸ªäº‹ç‰©
 			if (!transaction(db))
 			{
-				if(!Console)
-					AfxMessageBox(_T("ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"));
-				else
-					std::cout<<"ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"<<std::endl;
+				std::cout<<"æ— æ³•å¯åŠ¨äº‹åŠ¡å¤„ç†!"<<std::endl;
 
 				return false;
 			}
 
-			// ÈôĞŞ¸Ä²Ù×÷Ê§°Ü
-			if (sqlite3_exec(db, UpData_SQL, NULL, NULL, &errMsg) != SQLITE_OK)
+			// è‹¥ä¿®æ”¹æ“ä½œå¤±è´¥
+			if (sqlite3_exec(db, UpData_SQL.c_str(), NULL, NULL, &errMsg) != SQLITE_OK)
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-				else
-					std::cout<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»ØĞŞ¸ÄÊ§°ÜĞÅÏ¢
-				return FALSE;
+				// è¿”å›ä¿®æ”¹å¤±è´¥ä¿¡æ¯
+				return false;
 			}
 
-			//Ìá½»ÊÂÎñ
+			//æäº¤äº‹åŠ¡
 			if (commitTransaction(db) == false)
 			{
-				// »Ø¹öÊÂÎñ
+				// å›æ»šäº‹åŠ¡
 				rollbackTransaction(db);
 
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					AfxMessageBox(_T("ĞŞ¸ÄÊı¾İ²Ù×÷Ê§°Ü: ") + (CString)sqlite3_errmsg(db));
-				else
-					std::cout<<"ĞŞ¸ÄÊı¾İ²Ù×÷Ê§°Ü: "<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<"ä¿®æ”¹æ•°æ®æ“ä½œå¤±è´¥: "<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»ØĞŞ¸ÄÊ§°ÜĞÅÏ¢
-				return FALSE;
+				// è¿”å›ä¿®æ”¹å¤±è´¥ä¿¡æ¯
+				return false;
 			}
 
-			// ·µ»ØĞŞ¸Ä³É¹¦ĞÅÏ¢
+			// è¿”å›ä¿®æ”¹æˆåŠŸä¿¡æ¯
 			else
-				return TRUE;
+				return true;
 		}
 		catch (...)
 		{
-			// ÌáÊ¾´íÎóĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("ĞŞ¸ÄÊı¾İ²Ù×÷Ê§°Ü!"));
-			else
-				std::cout<<"ĞŞ¸ÄÊı¾İ²Ù×÷Ê§°Ü!"<<std::endl;
+			// æç¤ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"ä¿®æ”¹æ•°æ®æ“ä½œå¤±è´¥!"<<std::endl;
 
-			// ·µ»ØĞŞ¸ÄÊ§°ÜĞÅÏ¢
-			return FALSE;
+			// è¿”å›ä¿®æ”¹å¤±è´¥ä¿¡æ¯
+			return false;
 		}
 	}
 
-	// Ä¬ÈÏ·µ»ØĞŞ¸ÄÊ§°ÜĞÅÏ¢
-	return FALSE;
+	// é»˜è®¤è¿”å›ä¿®æ”¹å¤±è´¥ä¿¡æ¯
+	return false;
 }
 
 
-// ´ÓÄ¿±êÊı¾İ±íÖĞĞŞ¸ÄÊı¾İÏî
-BOOL CSqliteManager::UpdataData(CString TableName, CString ColumnParams, CString Params, bool Console)
+// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­ä¿®æ”¹æ•°æ®é¡¹
+bool CSqliteManager::UpdataData(string TableName, string ColumnParams, string Params)
 {
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
 	if (!IsConnect)
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"));
-		else
-			std::cout<<"Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
 
-		// ·µ»ØĞŞ¸ÄÊ§°ÜĞÅÏ¢
-		return FALSE;
+		// è¿”å›ä¿®æ”¹å¤±è´¥ä¿¡æ¯
+		return false;
 	}
 	else
 	{
-		// ³¢ÊÔÖ´ĞĞĞŞ¸ÄÊı¾İµÄ²Ù×÷
+		// å°è¯•æ‰§è¡Œä¿®æ”¹æ•°æ®çš„æ“ä½œ
 		try
 		{
-			// ³õÊ¼»¯SQLÓï¾ä
-			CStringA UpData_SQL;
+			// åˆå§‹åŒ–SQLè¯­å¥
+			string UpData_SQL;
 
-			// Èô²ÎÊıÎª¿Õ
-			if (Params.IsEmpty())
+			// è‹¥å‚æ•°ä¸ºç©º
+			if (Params.empty())
 			{
-				UpData_SQL = _T("UPDATE ") + TableName + _T(" SET ") + ColumnParams + _T(";");
+				UpData_SQL = "UPDATE " + TableName + " SET " + ColumnParams + ";";
 			}
 			else
 			{
-				UpData_SQL = _T("UPDATE ") + TableName + _T(" SET ") + ColumnParams + _T(" Where ") + Params + _T(";");
+				UpData_SQL = "UPDATE " + TableName + " SET " + ColumnParams + " Where " + Params + ";";
 			}
 
-			//Êı¾İ¿âÆô¶¯Ò»¸öÊÂÎï
+			//æ•°æ®åº“å¯åŠ¨ä¸€ä¸ªäº‹ç‰©
 			if (!transaction(db))
 			{
-				if(!Console)
-					AfxMessageBox(_T("ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"));
-				else
-					std::cout<<"ÎŞ·¨Æô¶¯ÊÂÎñ´¦Àí!"<<std::endl;
+				std::cout<<"æ— æ³•å¯åŠ¨äº‹åŠ¡å¤„ç†!"<<std::endl;
 
 				return false;
 			}
 
-			// ÈôĞŞ¸Ä²Ù×÷Ê§°Ü
-			if (sqlite3_exec(db, UpData_SQL, NULL, NULL, &errMsg) != SQLITE_OK)
+			// è‹¥ä¿®æ”¹æ“ä½œå¤±è´¥
+			if (sqlite3_exec(db, UpData_SQL.c_str(), NULL, NULL, &errMsg) != SQLITE_OK)
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-				else
-					std::cout<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»ØĞŞ¸ÄÊ§°ÜĞÅÏ¢
-				return FALSE;
+				// è¿”å›ä¿®æ”¹å¤±è´¥ä¿¡æ¯
+				return false;
 			}
 
-			//Ìá½»ÊÂÎñ
+			//æäº¤äº‹åŠ¡
 			if (commitTransaction(db) == false)
 			{
-				// »Ø¹öÊÂÎñ
+				// å›æ»šäº‹åŠ¡
 				rollbackTransaction(db);
 
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					AfxMessageBox(_T("ĞŞ¸ÄÊı¾İ²Ù×÷Ê§°Ü: ") + (CString)sqlite3_errmsg(db));
-				else
-					std::cout<<"ĞŞ¸ÄÊı¾İ²Ù×÷Ê§°Ü: "<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<"ä¿®æ”¹æ•°æ®æ“ä½œå¤±è´¥: "<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»ØĞŞ¸ÄÊ§°ÜĞÅÏ¢
-				return FALSE;
+				// è¿”å›ä¿®æ”¹å¤±è´¥ä¿¡æ¯
+				return false;
 			}
 
-			// ·µ»ØĞŞ¸Ä³É¹¦ĞÅÏ¢
+			// è¿”å›ä¿®æ”¹æˆåŠŸä¿¡æ¯
 			else
-				return TRUE;
+				return true;
 		}
 		catch (...)
 		{
-			// ÌáÊ¾´íÎóĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("ĞŞ¸ÄÊı¾İ²Ù×÷Ê§°Ü!"));
-			else
-				std::cout<<"ĞŞ¸ÄÊı¾İ²Ù×÷Ê§°Ü!"<<std::endl;
+			// æç¤ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"ä¿®æ”¹æ•°æ®æ“ä½œå¤±è´¥!"<<std::endl;
 
-			// ·µ»ØĞŞ¸ÄÊ§°ÜĞÅÏ¢
-			return FALSE;
+			// è¿”å›ä¿®æ”¹å¤±è´¥ä¿¡æ¯
+			return false;
 		}
 	}
 
-	// Ä¬ÈÏ·µ»ØĞŞ¸ÄÊ§°ÜĞÅÏ¢
-	return FALSE;
+	// é»˜è®¤è¿”å›ä¿®æ”¹å¤±è´¥ä¿¡æ¯
+	return false;
 }
 
 
-// ´ÓÄ¿±êÊı¾İ±íÖĞ²éÑ¯Êı¾İÏî
-BOOL CSqliteManager::SelectData(CString TableName, vector<CString> &pResult,  CString Params, bool Console, CString Order, CString Limit, int SortMode, BOOL DISTINCT, CString COUNT, CString COLUMN, CString GROUP, CString HAVING)
+// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æŸ¥è¯¢æ•°æ®é¡¹
+bool CSqliteManager::SelectData(string TableName, vector<string> &pResult,  string Params, string Order, string Limit, int SortMode, bool DISTINCT, string COUNT, string COLUMN, string GROUP, string HAVING)
 {
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
 	if (!IsConnect)
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"));
-		else
-			std::cout<<"Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
 
-		// ·µ»Ø²éÑ¯Ê§°ÜĞÅÏ¢
-		return FALSE;
+		// è¿”å›æŸ¥è¯¢å¤±è´¥ä¿¡æ¯
+		return false;
 	}
 	else
 	{
-		// ³¢ÊÔÖ´ĞĞ²éÑ¯Êı¾İµÄ²Ù×÷
+		// å°è¯•æ‰§è¡ŒæŸ¥è¯¢æ•°æ®çš„æ“ä½œ
 		try
 		{
-			// Çå¿ÕÔ­ÏÈµÄ½á¹û¼¯
+			// æ¸…ç©ºåŸå…ˆçš„ç»“æœé›†
 			pResult.clear();
 
-			// ¶¨Òå²éÑ¯²ÎÊı
+			// å®šä¹‰æŸ¥è¯¢å‚æ•°
 			int rc, i, ncols;
 			const char *tail;
 
-			// ³õÊ¼»¯SQLÓï¾ä
-			CStringA Select_SQL;
-			CString  DISTINCT_Text = _T("");
+			// åˆå§‹åŒ–SQLè¯­å¥
+			string Select_SQL;
+			string  DISTINCT_Text = "";
 
-			CString  SortText = _T("");
+			string  SortText = "";
 
-			// ÈôÊı¾İÁĞÎª¿Õ
-			if (COLUMN.IsEmpty())
+			// è‹¥æ•°æ®åˆ—ä¸ºç©º
+			if (COLUMN.empty())
 			{
 				if (DISTINCT)
 				{
-					// ÌáÊ¾´íÎó
-					if(!Console)
-						AfxMessageBox(_T("ÁĞÎª¿ÕµÄÇé¿öÏÂ, DISTINCT ²»¿ÉÒÔÎªÕæ!"));
-					else
-						std::cout<<"ÁĞÎª¿ÕµÄÇé¿öÏÂ, DISTINCT ²»¿ÉÒÔÎªÕæ!"<<std::endl;
+					// æç¤ºé”™è¯¯
+					std::cout<<"åˆ—ä¸ºç©ºçš„æƒ…å†µä¸‹, DISTINCT ä¸å¯ä»¥ä¸ºçœŸ!"<<std::endl;
 
-					return FALSE;
+					return false;
 				}
-				if (!COUNT.IsEmpty())
+				if (!COUNT.empty())
 				{
-					// ÌáÊ¾´íÎó
-					if(!Console)
-						AfxMessageBox(_T("ÁĞÎª¿ÕµÄÇé¿öÏÂ, COUNT ²»¿ÉÒÔ²»Îª¿Õ!"));
-					else
-						std::cout<<"ÁĞÎª¿ÕµÄÇé¿öÏÂ, COUNT ²»¿ÉÒÔ²»Îª¿Õ!"<<std::endl;
+					// æç¤ºé”™è¯¯
+					std::cout<<"åˆ—ä¸ºç©ºçš„æƒ…å†µä¸‹, COUNT ä¸å¯ä»¥ä¸ä¸ºç©º!"<<std::endl;
 
-					return FALSE;
+					return false;
 				}
 
-				COLUMN = _T("*");
+				COLUMN = "*";
 			}
 			else
 			{
-				// ÈôÈ¥³ıÖØ¸´ÎªÕæ
+				// è‹¥å»é™¤é‡å¤ä¸ºçœŸ
 				if (DISTINCT)
 				{
-					DISTINCT_Text = _T("DISTINCT ");
+					DISTINCT_Text = "DISTINCT ";
 				}
 
-				// Èô¼ÆÊı²»Îª¿Õ
-				if (!COUNT.IsEmpty())
+				// è‹¥è®¡æ•°ä¸ä¸ºç©º
+				if (!COUNT.empty())
 				{
-					COUNT = _T(", ") + COUNT;
+					COUNT = ", " + COUNT;
 				}
 			}
 
-			// Èô²ÎÊıÎª¿Õ
-			if (Params.IsEmpty())
+			// è‹¥å‚æ•°ä¸ºç©º
+			if (Params.empty())
 			{
-				if (!GROUP.IsEmpty())
+				if (!GROUP.empty())
 				{
-					// ÌáÊ¾´íÎó
-					if(!Console)
-						AfxMessageBox(_T("²ÎÊıÎª¿ÕµÄÇé¿öÏÂ, ·Ö×é²»¿ÉÒÔ²»Îª¿Õ!"));
-					else
-						std::cout<<"²ÎÊıÎª¿ÕµÄÇé¿öÏÂ, ·Ö×é²»¿ÉÒÔ²»Îª¿Õ!"<<std::endl;
+					// æç¤ºé”™è¯¯
+					std::cout<<"å‚æ•°ä¸ºç©ºçš„æƒ…å†µä¸‹, åˆ†ç»„ä¸å¯ä»¥ä¸ä¸ºç©º!"<<std::endl;
 
-					return FALSE;
+					return false;
 				}
 
-				if (!HAVING.IsEmpty())
+				if (!HAVING.empty())
 				{
-					// ÌáÊ¾´íÎó
-					if(!Console)
-						AfxMessageBox(_T("²ÎÊıÎª¿ÕµÄÇé¿öÏÂ, É¸Ñ¡²»¿ÉÒÔ²»Îª¿Õ!"));
-					else
-						std::cout<<"²ÎÊıÎª¿ÕµÄÇé¿öÏÂ, É¸Ñ¡²»¿ÉÒÔ²»Îª¿Õ!"<<std::endl;
+					// æç¤ºé”™è¯¯
+					std::cout<<"å‚æ•°ä¸ºç©ºçš„æƒ…å†µä¸‹, ç­›é€‰ä¸å¯ä»¥ä¸ä¸ºç©º!"<<std::endl;
 
-					return FALSE;
+					return false;
 				}
 
-				if (!Order.IsEmpty())
+				if (!Order.empty())
 				{
-					// ÌáÊ¾´íÎó
-					if(!Console)
-						AfxMessageBox(_T("²ÎÊıÎª¿ÕµÄÇé¿öÏÂ, ÅÅĞò²»¿ÉÒÔ²»Îª¿Õ!"));
-					else
-						std::cout<<"²ÎÊıÎª¿ÕµÄÇé¿öÏÂ, ÅÅĞò²»¿ÉÒÔ²»Îª¿Õ!"<<std::endl;
+					// æç¤ºé”™è¯¯
+					std::cout<<"å‚æ•°ä¸ºç©ºçš„æƒ…å†µä¸‹, æ’åºä¸å¯ä»¥ä¸ä¸ºç©º!"<<std::endl;
 
-					return FALSE;
+					return false;
 				}
 
-				if (!Limit.IsEmpty())
+				if (!Limit.empty())
 				{
-					// ÌáÊ¾´íÎó
-					if(!Console)
-						AfxMessageBox(_T("²ÎÊıÎª¿ÕµÄÇé¿öÏÂ, Æ«ÒÆÁ¿²»¿ÉÒÔ²»Îª¿Õ!"));
-					else
-						std::cout<<"²ÎÊıÎª¿ÕµÄÇé¿öÏÂ, Æ«ÒÆÁ¿²»¿ÉÒÔ²»Îª¿Õ!"<<std::endl;
+					// æç¤ºé”™è¯¯
+					std::cout<<"å‚æ•°ä¸ºç©ºçš„æƒ…å†µä¸‹, åç§»é‡ä¸å¯ä»¥ä¸ä¸ºç©º!"<<std::endl;
 
-					return FALSE;
+					return false;
 				}
 
-				// ¹¹Ôì²éÑ¯SQL
-				Select_SQL = _T("SELECT ") + DISTINCT_Text + COLUMN + COUNT + _T(" FROM ") + TableName + _T(";");
+				// æ„é€ æŸ¥è¯¢SQL
+				Select_SQL = "SELECT " + DISTINCT_Text + COLUMN + COUNT + " FROM " + TableName + ";";
 			}
 			else
 			{
-				// Èô·Ö×é²»Îª¿Õ
-				if (!GROUP.IsEmpty())
+				// è‹¥åˆ†ç»„ä¸ä¸ºç©º
+				if (!GROUP.empty())
 				{
-					GROUP = _T(" GROUP By ") + GROUP;
+					GROUP = " GROUP By " + GROUP;
 				}
 
-				// ÈôÉ¸Ñ¡²»Îª¿Õ
-				if (!HAVING.IsEmpty())
+				// è‹¥ç­›é€‰ä¸ä¸ºç©º
+				if (!HAVING.empty())
 				{
-					HAVING = _T(" HAVING ") + HAVING;
+					HAVING = " HAVING " + HAVING;
 				}
 
-				// ÈôÅÅĞò²»Îª¿Õ
-				if (!Order.IsEmpty())
+				// è‹¥æ’åºä¸ä¸ºç©º
+				if (!Order.empty())
 				{
-					Order = _T(" Order by ") + Order;
+					Order = " Order by " + Order;
 
-					// ¸ù¾İ´úÂë½øĞĞÅÅĞò
+					// æ ¹æ®ä»£ç è¿›è¡Œæ’åº
 					if (SortMode == MOD_ASC)
 					{
-						SortText = _T(" ASC ");
+						SortText = " ASC ";
 					}
 					else
 					{
-						SortText = _T(" DESC ");
+						SortText = " DESC ";
 					}
 				}
 				else
 				{
-					Order    = _T("");
-					SortText = _T("");
+					Order    = "";
+					SortText = "";
 				}
 
-				// ÈôÆ«ÒÆÁ¿²»Îª¿Õ
-				if (!Limit.IsEmpty())
+				// è‹¥åç§»é‡ä¸ä¸ºç©º
+				if (!Limit.empty())
 				{
-					Limit = _T(" Limit ") + Limit;
+					Limit = " Limit " + Limit;
 				}
 
-				// ¹¹Ôì²éÑ¯SQL
-				Select_SQL = _T("SELECT ") + DISTINCT_Text + COLUMN + COUNT + _T(" FROM ") + TableName + _T(" Where ") + Params + GROUP + HAVING + Order + SortText + Limit + _T(";");
+				// æ„é€ æŸ¥è¯¢SQL
+				Select_SQL = "SELECT " + DISTINCT_Text + COLUMN + COUNT + " FROM " + TableName + " Where " + Params + GROUP + HAVING + Order + SortText + Limit + ";";
 			}
 
-			// ÈôÔ¤´¦Àí²Ù×÷³É¹¦
-			if (sqlite3_prepare(db, Select_SQL, (int)strlen(Select_SQL), &stmt, &tail) == SQLITE_OK)
+			// è‹¥é¢„å¤„ç†æ“ä½œæˆåŠŸ
+			if (sqlite3_prepare(db, Select_SQL.c_str(), Select_SQL.length(), &stmt, &tail) == SQLITE_OK)
 			{
 				rc    = sqlite3_step(stmt);
 				ncols = sqlite3_column_count(stmt);
@@ -3067,962 +2413,1060 @@ BOOL CSqliteManager::SelectData(CString TableName, vector<CString> &pResult,  CS
 				{
 					for (i = 0; i < ncols; i++)
 					{
-						// Ñ­»·½«²éÑ¯½á¹û·ÅÈë½á¹û¼¯
-						pResult.push_back((CString)sqlite3_column_text(stmt, i));
+						// å¾ªç¯å°†æŸ¥è¯¢ç»“æœæ”¾å…¥ç»“æœé›†
+						pResult.push_back((char*)sqlite3_column_text(stmt, i));
 					}
 					
 					rc = sqlite3_step(stmt);
 				}
 
-				//ÊÍ·Åstatement
+				//é‡Šæ”¾statement
 				sqlite3_finalize(stmt);
 
-				// ·µ»Ø²éÑ¯³É¹¦ĞÅÏ¢
-				return TRUE;
+				// è¿”å›æŸ¥è¯¢æˆåŠŸä¿¡æ¯
+				return true;
 			}
 			else
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-				else
-					std::cout<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»Ø²éÑ¯Ê§°ÜĞÅÏ¢
-				return FALSE;
+				// è¿”å›æŸ¥è¯¢å¤±è´¥ä¿¡æ¯
+				return false;
 			}
 
-			// ÊÍ·Å±äÁ¿
+			// é‡Šæ”¾å˜é‡
 			sqlite3_finalize(stmt);
 		}
 		catch (...)
 		{
-			// ÌáÊ¾´íÎóĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("²éÑ¯Êı¾İ²Ù×÷Ê§°Ü!"));
-			else
-				std::cout<<"²éÑ¯Êı¾İ²Ù×÷Ê§°Ü!"<<std::endl;
+			// æç¤ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"æŸ¥è¯¢æ•°æ®æ“ä½œå¤±è´¥!"<<std::endl;
 
-			// ·µ»Ø²éÑ¯Ê§°ÜĞÅÏ¢
-			return FALSE;
+			// è¿”å›æŸ¥è¯¢å¤±è´¥ä¿¡æ¯
+			return false;
 		}
 	}
 
-	// Ä¬ÈÏ·µ»Ø²éÑ¯Ê§°ÜĞÅÏ¢
-	return FALSE;
+	// é»˜è®¤è¿”å›æŸ¥è¯¢å¤±è´¥ä¿¡æ¯
+	return false;
 }
 
 
-// ´ÓÄ¿±êÊı¾İ±íÖĞ²éÑ¯µ¥Êı¾İ
-BOOL CSqliteManager::SelectData(CString TableName, CString &pResult, int Col, CString Params, bool Console, CString Order, CString Limit, int SortMode, BOOL DISTINCT, CString COUNT, CString COLUMN, CString GROUP, CString HAVING)
+// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æŸ¥è¯¢åˆ—æ•°æ®
+bool CSqliteManager::SelectData(string TableName, string &pResult, int Col, string Params, string Order, string Limit, int SortMode, bool DISTINCT, string COUNT, string COLUMN, string GROUP, string HAVING)
 {
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
 	if (!IsConnect)
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"));
-		else
-			std::cout<<"Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
 
-		// ·µ»Ø²éÑ¯Ê§°ÜĞÅÏ¢
-		return FALSE;
+		// è¿”å›æŸ¥è¯¢å¤±è´¥ä¿¡æ¯
+		return false;
 	}
 	else
 	{
-		// ³¢ÊÔÖ´ĞĞ²éÑ¯Êı¾İµÄ²Ù×÷
+		// å°è¯•æ‰§è¡ŒæŸ¥è¯¢æ•°æ®çš„æ“ä½œ
 		try
 		{
-			// Çå¿ÕÔ­ÏÈµÄ½á¹û
-			pResult = _T("");
+			// æ¸…ç©ºåŸå…ˆçš„ç»“æœ
+			pResult = "";
 
-			// ¶¨Òå²éÑ¯²ÎÊı
+			// å®šä¹‰æŸ¥è¯¢å‚æ•°
 			int rc, i, ncols;
 			const char *tail;
 
-			// ³õÊ¼»¯SQLÓï¾ä
-			CStringA Select_SQL;
-			CString  DISTINCT_Text = _T("");
+			// åˆå§‹åŒ–SQLè¯­å¥
+			string Select_SQL;
+			string  DISTINCT_Text = "";
 
-			CString  SortText = _T("");
+			string  SortText = "";
 
-			// ÈôÊı¾İÁĞÎª¿Õ
-			if (COLUMN.IsEmpty())
+			// è‹¥æ•°æ®åˆ—ä¸ºç©º
+			if (COLUMN.empty())
 			{
 				if (DISTINCT)
 				{
-					// ÌáÊ¾´íÎó
-					if(!Console)
-						AfxMessageBox(_T("ÁĞÎª¿ÕµÄÇé¿öÏÂ, DISTINCT ²»¿ÉÒÔÎªÕæ!"));
-					else
-						std::cout<<"ÁĞÎª¿ÕµÄÇé¿öÏÂ, DISTINCT ²»¿ÉÒÔÎªÕæ!"<<std::endl;
+					// æç¤ºé”™è¯¯
+					std::cout<<"åˆ—ä¸ºç©ºçš„æƒ…å†µä¸‹, DISTINCT ä¸å¯ä»¥ä¸ºçœŸ!"<<std::endl;
 
-					return FALSE;
+					return false;
 				}
-				if (!COUNT.IsEmpty())
+				if (!COUNT.empty())
 				{
-					// ÌáÊ¾´íÎó
-					if(!Console)
-						AfxMessageBox(_T("ÁĞÎª¿ÕµÄÇé¿öÏÂ, COUNT ²»¿ÉÒÔ²»Îª¿Õ!"));
-					else
-						std::cout<<"ÁĞÎª¿ÕµÄÇé¿öÏÂ, COUNT ²»¿ÉÒÔ²»Îª¿Õ!"<<std::endl;
+					// æç¤ºé”™è¯¯
+					std::cout<<"åˆ—ä¸ºç©ºçš„æƒ…å†µä¸‹, COUNT ä¸å¯ä»¥ä¸ä¸ºç©º!"<<std::endl;
 
-					return FALSE;
+					return false;
 				}
 
-				COLUMN = _T("*");
+				COLUMN = "*";
 			}
 			else
 			{
-				// ÈôÈ¥³ıÖØ¸´ÎªÕæ
+				// è‹¥å»é™¤é‡å¤ä¸ºçœŸ
 				if (DISTINCT)
 				{
-					DISTINCT_Text = _T("DISTINCT ");
+					DISTINCT_Text = "DISTINCT ";
 				}
 
-				// Èô¼ÆÊı²»Îª¿Õ
-				if (!COUNT.IsEmpty())
+				// è‹¥è®¡æ•°ä¸ä¸ºç©º
+				if (!COUNT.empty())
 				{
-					COUNT = _T(", ") + COUNT;
+					COUNT = ", " + COUNT;
 				}
 			}
 
-			// Èô²ÎÊıÎª¿Õ
-			if (Params.IsEmpty())
+			// è‹¥å‚æ•°ä¸ºç©º
+			if (Params.empty())
 			{
-				if (!GROUP.IsEmpty())
+				if (!GROUP.empty())
 				{
-					// ÌáÊ¾´íÎó
-					if(!Console)
-						AfxMessageBox(_T("²ÎÊıÎª¿ÕµÄÇé¿öÏÂ, ·Ö×é²»¿ÉÒÔ²»Îª¿Õ!"));
-					else
-						std::cout<<"²ÎÊıÎª¿ÕµÄÇé¿öÏÂ, ·Ö×é²»¿ÉÒÔ²»Îª¿Õ!"<<std::endl;
+					// æç¤ºé”™è¯¯
+					std::cout<<"å‚æ•°ä¸ºç©ºçš„æƒ…å†µä¸‹, åˆ†ç»„ä¸å¯ä»¥ä¸ä¸ºç©º!"<<std::endl;
 
-					return FALSE;
+					return false;
 				}
 
-				if (!HAVING.IsEmpty())
+				if (!HAVING.empty())
 				{
-					// ÌáÊ¾´íÎó
-					if(!Console)
-						AfxMessageBox(_T("²ÎÊıÎª¿ÕµÄÇé¿öÏÂ, É¸Ñ¡²»¿ÉÒÔ²»Îª¿Õ!"));
-					else
-						std::cout<<"²ÎÊıÎª¿ÕµÄÇé¿öÏÂ, É¸Ñ¡²»¿ÉÒÔ²»Îª¿Õ!"<<std::endl;
+					// æç¤ºé”™è¯¯
+					std::cout<<"å‚æ•°ä¸ºç©ºçš„æƒ…å†µä¸‹, ç­›é€‰ä¸å¯ä»¥ä¸ä¸ºç©º!"<<std::endl;
 
-					return FALSE;
+					return false;
 				}
 
-				if (!Order.IsEmpty())
+				if (!Order.empty())
 				{
-					// ÌáÊ¾´íÎó
-					if(!Console)
-						AfxMessageBox(_T("²ÎÊıÎª¿ÕµÄÇé¿öÏÂ, ÅÅĞò²»¿ÉÒÔ²»Îª¿Õ!"));
-					else
-						std::cout<<"²ÎÊıÎª¿ÕµÄÇé¿öÏÂ, ÅÅĞò²»¿ÉÒÔ²»Îª¿Õ!"<<std::endl;
+					// æç¤ºé”™è¯¯
+					std::cout<<"å‚æ•°ä¸ºç©ºçš„æƒ…å†µä¸‹, æ’åºä¸å¯ä»¥ä¸ä¸ºç©º!"<<std::endl;
 
-					return FALSE;
+					return false;
 				}
 
-				if (!Limit.IsEmpty())
+				if (!Limit.empty())
 				{
-					// ÌáÊ¾´íÎó
-					if(!Console)
-						AfxMessageBox(_T("²ÎÊıÎª¿ÕµÄÇé¿öÏÂ, Æ«ÒÆÁ¿²»¿ÉÒÔ²»Îª¿Õ!"));
-					else
-						std::cout<<"²ÎÊıÎª¿ÕµÄÇé¿öÏÂ, Æ«ÒÆÁ¿²»¿ÉÒÔ²»Îª¿Õ!"<<std::endl;
+					// æç¤ºé”™è¯¯
+					std::cout<<"å‚æ•°ä¸ºç©ºçš„æƒ…å†µä¸‹, åç§»é‡ä¸å¯ä»¥ä¸ä¸ºç©º!"<<std::endl;
 
-					return FALSE;
+					return false;
 				}
 
-				// ¹¹Ôì²éÑ¯SQL
-				Select_SQL = _T("SELECT ") + DISTINCT_Text + COLUMN + COUNT + _T(" FROM ") + TableName + _T(";");
+				// æ„é€ æŸ¥è¯¢SQL
+				Select_SQL = "SELECT " + DISTINCT_Text + COLUMN + COUNT + " FROM " + TableName + ";";
 			}
 			else
 			{
-				// Èô·Ö×é²»Îª¿Õ
-				if (!GROUP.IsEmpty())
+				// è‹¥åˆ†ç»„ä¸ä¸ºç©º
+				if (!GROUP.empty())
 				{
-					GROUP = _T(" GROUP By ") + GROUP;
+					GROUP = " GROUP By " + GROUP;
 				}
 
-				// ÈôÉ¸Ñ¡²»Îª¿Õ
-				if (!HAVING.IsEmpty())
+				// è‹¥ç­›é€‰ä¸ä¸ºç©º
+				if (!HAVING.empty())
 				{
-					HAVING = _T(" HAVING ") + HAVING;
+					HAVING = " HAVING " + HAVING;
 				}
 
-				// ÈôÅÅĞò²»Îª¿Õ
-				if (!Order.IsEmpty())
+				// è‹¥æ’åºä¸ä¸ºç©º
+				if (!Order.empty())
 				{
-					Order = _T(" Order by ") + Order;
+					Order = " Order by " + Order;
 
-					// ¸ù¾İ´úÂë½øĞĞÅÅĞò
+					// æ ¹æ®ä»£ç è¿›è¡Œæ’åº
 					if (SortMode == MOD_ASC)
 					{
-						SortText = _T(" ASC ");
+						SortText = " ASC ";
 					}
 					else
 					{
-						SortText = _T(" DESC ");
+						SortText = " DESC ";
 					}
 				}
 				else
 				{
-					Order    = _T("");
-					SortText = _T("");
+					Order    = "";
+					SortText = "";
 				}
 
-				// ÈôÆ«ÒÆÁ¿²»Îª¿Õ
-				if (!Limit.IsEmpty())
+				// è‹¥åç§»é‡ä¸ä¸ºç©º
+				if (!Limit.empty())
 				{
-					Limit = _T(" Limit ") + Limit;
+					Limit = " Limit " + Limit;
 				}
 
-				// ¹¹Ôì²éÑ¯SQL
-				Select_SQL = _T("SELECT ") + DISTINCT_Text + COLUMN + COUNT + _T(" FROM ") + TableName + _T(" Where ") + Params + GROUP + HAVING + Order + SortText + Limit + _T(";");
+				// æ„é€ æŸ¥è¯¢SQL
+				Select_SQL = "SELECT " + DISTINCT_Text + COLUMN + COUNT + " FROM " + TableName + " Where " + Params + GROUP + HAVING + Order + SortText + Limit + ";";
 			}
 
-			// ÈôÔ¤´¦Àí²Ù×÷³É¹¦
-			if (sqlite3_prepare(db, Select_SQL, (int)strlen(Select_SQL), &stmt, &tail) == SQLITE_OK)
+			// è‹¥é¢„å¤„ç†æ“ä½œæˆåŠŸ
+			if (sqlite3_prepare(db, Select_SQL.c_str(), Select_SQL.length(), &stmt, &tail) == SQLITE_OK)
 			{
-				// rÈôÄ¿±êÁĞÎª0
+				// rè‹¥ç›®æ ‡åˆ—ä¸º0
 				if (Col == 0)
 					Col = 1;
 
-				// Ö´ĞĞÔ¤´¦Àí
+				// æ‰§è¡Œé¢„å¤„ç†
 				rc = sqlite3_step(stmt);
 				ncols = sqlite3_column_count(stmt);
 				while (rc == SQLITE_ROW)
 				{
-					// Ñ­»·µÃµ½²éÑ¯½á¹û
+					// å¾ªç¯å¾—åˆ°æŸ¥è¯¢ç»“æœ
 					for (i = 0; i < ncols; i++)
 					{
-						// ÈôÄ¿±êÁĞÓëiÏàµÈ
+						// è‹¥ç›®æ ‡åˆ—ä¸iç›¸ç­‰
 						if (i == Col)
 						{
-							// µÃµ½Ä¿±êÊı¾İ
-							pResult = (CString)sqlite3_column_text(stmt, i);
+							// å¾—åˆ°ç›®æ ‡æ•°æ®
+							pResult = (char*)sqlite3_column_text(stmt, i);
 						}
 					}
 
 					rc = sqlite3_step(stmt);
 				}
 
-				//ÊÍ·Åstatement
+				//é‡Šæ”¾statement
 				sqlite3_finalize(stmt);
 
-				// ·µ»Ø²éÑ¯³É¹¦ĞÅÏ¢
-				return TRUE;
+				// è¿”å›æŸ¥è¯¢æˆåŠŸä¿¡æ¯
+				return true;
 			}
 			else
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-				else
-					std::cout<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»Ø²éÑ¯Ê§°ÜĞÅÏ¢
-				return FALSE;
+				// è¿”å›æŸ¥è¯¢å¤±è´¥ä¿¡æ¯
+				return false;
 			}
 
-			// ÊÍ·Å±äÁ¿
+			// é‡Šæ”¾å˜é‡
 			sqlite3_finalize(stmt);
 		}
 		catch (...)
 		{
-			// ÌáÊ¾´íÎóĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("²éÑ¯Êı¾İ²Ù×÷Ê§°Ü!"));
-			else
-				std::cout<<"²éÑ¯Êı¾İ²Ù×÷Ê§°Ü!"<<std::endl;
+			// æç¤ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"æŸ¥è¯¢æ•°æ®æ“ä½œå¤±è´¥!"<<std::endl;
 
-			// ·µ»Ø²éÑ¯Ê§°ÜĞÅÏ¢
-			return FALSE;
+			// è¿”å›æŸ¥è¯¢å¤±è´¥ä¿¡æ¯
+			return false;
 		}
 	}
 
-	// Ä¬ÈÏ·µ»Ø²éÑ¯Ê§°ÜĞÅÏ¢
-	return FALSE;
+	// é»˜è®¤è¿”å›æŸ¥è¯¢å¤±è´¥ä¿¡æ¯
+	return false;
 }
 
 
-// ÔÚÄ¿±êÊı¾İ±íÖĞ¼ì²éÊı¾İÏî
-BOOL CSqliteManager::CheckData (CString TableName, int Col, CString Params, bool Console, CString Order, CString Limit, int SortMode, BOOL DISTINCT, CString COUNT, CString COLUMN, CString GROUP, CString HAVING)
+// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æŸ¥è¯¢æ•°æ®å€¼
+bool CSqliteManager::SelectData(string TableName, string &pResult, string Column, string Params, string Order, string Limit, int SortMode, bool DISTINCT, string COUNT, string COLUMN, string GROUP, string HAVING)
 {
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
-	if (!IsConnect)
+	// é“¾è¡¨å¯¹è±¡
+	vector<string> Values;
+
+	// æŸ¥è¯¢æ•°æ®
+	if(! SelectData(TableName, Values, Params, Order, Limit, SortMode, DISTINCT, COUNT, COLUMN, GROUP, HAVING) )
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"));
-		else
-			std::cout<<"Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æŸ¥è¯¢æ•°æ®æ“ä½œå¤±è´¥!"<<std::endl;
 
-		// ·µ»Ø²éÑ¯Ê§°ÜĞÅÏ¢
-		return FALSE;
-	}
-	else
-	{
-		CString CheckData = _T("");
-
-		if (SelectData(TableName, CheckData, Col, Params, Console, Order, Limit, SortMode, DISTINCT, COUNT, COLUMN, GROUP, HAVING))
-		{
-			if (!CheckData.IsEmpty() && CheckData != _T(""))
-			{
-				// ·µ»ØÄ¿±êÊı¾İ´æÔÚ
-				return TRUE;
-			}
-			else
-			{
-				// ·µ»ØÄ¿±êÊı¾İ²»´æÔÚ
-				return FALSE;
-			}
-		}
-		else
-		{
-			// ÌáÊ¾´íÎóĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("Êı¾İ¿â²éÑ¯Ê§°Ü!"));
-			else
-				std::cout<<"Êı¾İ¿â²éÑ¯Ê§°Ü!"<<std::endl;
-
-			// ·µ»Ø²éÑ¯Ê§°ÜĞÅÏ¢
-			return FALSE;
-		}
+		// è¿”å›æŸ¥è¯¢å¤±è´¥
+		return false;
 	}
 
-	// Ä¬ÈÏ·µ»Ø²éÑ¯Ê§°ÜĞÅÏ¢
-	return FALSE;
+	// è·å–åˆ—å
+	string ColName;
+	GetColName(TableName, ColName);
+
+	// åˆ†å‰²å­—ç¬¦ä¸²
+	vector<string> pArray;
+	Split(ColName, pArray, ";");
+
+	/*stringrray pArray;
+	Split(ColName, _T(";"), pArray);*/
+
+	// åŒ¹é…åˆ—
+	int col = 0, size = pArray.size();
+	for(int c = 0; c < size; c++)
+	{
+		if(pArray.at(c) == Column)
+			col = c;
+	}
+
+	// å¾ªç¯å–å€¼
+	for(unsigned int i = 0; i < Values.size(); i += size)
+	{
+		// ä¿å­˜ç»“æœ
+		pResult = Values.at(i + col);
+	}
+
+	// è¿”å›æŸ¥è¯¢æˆåŠŸä¿¡æ¯
+	return true;
 }
 
 
-// Í³¼ÆÄ¿±êÊı¾İ±íÖĞÊı¾İÊıÏî
-BOOL CSqliteManager::CountNumber(CString TableName, CString Params, int &Count, bool Console)
+// åœ¨ç›®æ ‡æ•°æ®è¡¨ä¸­æ£€æŸ¥æ•°æ®é¡¹
+bool CSqliteManager::CheckData (string TableName, int Col, string Params, string Order, string Limit, int SortMode, bool DISTINCT, string COUNT, string COLUMN, string GROUP, string HAVING)
 {
-	// ÈôÊı¾İ¿âÎ´Á¬½Ó³É¹¦
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
 	if (!IsConnect)
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"));
-		else
-			std::cout<<"Êı¾İ¿âÎ´Á¬½Ó£¬ÇëÏÈÁ¬½ÓÊı¾İ¿â!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
 
-		// ·µ»Ø´´½¨Ê§°ÜĞÅÏ¢
-		return FALSE;
+		// è¿”å›æŸ¥è¯¢å¤±è´¥ä¿¡æ¯
+		return false;
 	}
 	else
 	{
-		// ÓÃÓÚÅĞ¶Ï²Ù×÷ÊÇ·ñ³É¹¦
-		BOOL IsSuccess;
+		string CheckData = "";
 
-		// ³¢ÊÔÖ´ĞĞ»ñÈ¡Êı¾İ±íÖĞÁĞÃûµÄ²Ù×÷
+		if (SelectData(TableName, CheckData, Col, Params, Order, Limit, SortMode, DISTINCT, COUNT, COLUMN, GROUP, HAVING))
+		{
+			if (!CheckData.empty() && CheckData != "")
+			{
+				// è¿”å›ç›®æ ‡æ•°æ®å­˜åœ¨
+				return true;
+			}
+			else
+			{
+				// è¿”å›ç›®æ ‡æ•°æ®ä¸å­˜åœ¨
+				return false;
+			}
+		}
+		else
+		{
+			// æç¤ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"æ•°æ®åº“æŸ¥è¯¢å¤±è´¥!"<<std::endl;
+
+			// è¿”å›æŸ¥è¯¢å¤±è´¥ä¿¡æ¯
+			return false;
+		}
+	}
+
+	// é»˜è®¤è¿”å›æŸ¥è¯¢å¤±è´¥ä¿¡æ¯
+	return false;
+}
+
+
+// åœ¨ç›®æ ‡æ•°æ®è¡¨ä¸­æ£€æŸ¥æ•°æ®å€¼
+bool CSqliteManager::CheckData (string TableName, string Column, string Params, string Order, string Limit, int SortMode, bool DISTINCT, string COUNT, string COLUMN, string GROUP, string HAVING)
+{
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
+	if (!IsConnect)
+	{
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
+
+		// è¿”å›æŸ¥è¯¢å¤±è´¥ä¿¡æ¯
+		return false;
+	}
+	else
+	{
+		string CheckData = "";
+		if(Column == "" || Column.empty())
+			Column = "*";
+
+		if (SelectData(TableName, CheckData, Column, Params, Order, Limit, SortMode, DISTINCT, COUNT, COLUMN, GROUP, HAVING))
+		{
+			if (!CheckData.empty() && CheckData != "")
+			{
+				// è¿”å›ç›®æ ‡æ•°æ®å­˜åœ¨
+				return true;
+			}
+			else
+			{
+				// è¿”å›ç›®æ ‡æ•°æ®ä¸å­˜åœ¨
+				return false;
+			}
+		}
+		else
+		{
+			// æç¤ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"æ•°æ®åº“æŸ¥è¯¢å¤±è´¥!"<<std::endl;
+
+			// è¿”å›æŸ¥è¯¢å¤±è´¥ä¿¡æ¯
+			return false;
+		}
+	}
+
+	// é»˜è®¤è¿”å›æŸ¥è¯¢å¤±è´¥ä¿¡æ¯
+	return false;
+}
+
+
+// ç»Ÿè®¡ç›®æ ‡æ•°æ®è¡¨ä¸­æ•°æ®æ•°é¡¹
+bool CSqliteManager::CountData (string TableName, string Params, int &Count)
+{
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
+	if (!IsConnect)
+	{
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
+
+		// è¿”å›åˆ›å»ºå¤±è´¥ä¿¡æ¯
+		return false;
+	}
+	else
+	{
+		// ç”¨äºåˆ¤æ–­æ“ä½œæ˜¯å¦æˆåŠŸ
+		bool IsSuccess;
+
+		// å°è¯•æ‰§è¡Œè·å–æ•°æ®è¡¨ä¸­åˆ—åçš„æ“ä½œ
 		try
 		{
-			// ³õÊ¼»¯SQLÓï¾ä
-			CStringA GetSQL;
+			// åˆå§‹åŒ–SQLè¯­å¥
+			string GetSQL;
 
-			// Èô²ÎÊıÎª¿Õ
-			if (Params.IsEmpty())
+			// è‹¥å‚æ•°ä¸ºç©º
+			if (Params.empty())
 			{
-				GetSQL = "SELECT * FROM " + (CStringA)TableName + ";";
+				GetSQL = "SELECT * FROM " + TableName + ";";
 			}
 
-			// Èô²ÎÊı²»Îª¿Õ
+			// è‹¥å‚æ•°ä¸ä¸ºç©º
 			else
 			{
-				GetSQL = "SELECT * FROM " + (CStringA)TableName + " Where " + (CStringA)Params + ";";
+				GetSQL = "SELECT * FROM " + TableName + " Where " + Params + ";";
 			}
 			
 
-			// Èô»ñÈ¡²Ù×÷Ê§°Ü
-			if (sqlite3_get_table(db, GetSQL, &pRes, &nRow, &nCol, &errMsg) != SQLITE_OK)
+			// è‹¥è·å–æ“ä½œå¤±è´¥
+			if (sqlite3_get_table(db, GetSQL.c_str(), &pRes, &nRow, &nCol, &errMsg) != SQLITE_OK)
 			{
-				// ÌáÊ¾´íÎóĞÅÏ¢
-				if(!Console)
-					::MessageBox(NULL, (CString)sqlite3_errmsg(db), NULL, NULL);
-				else
-					std::cout<<sqlite3_errmsg(db)<<std::endl;
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(db)<<std::endl;
 
-				// ·µ»Ø»ñÈ¡Ê§°Ü
-				IsSuccess = FALSE;
+				// è¿”å›è·å–å¤±è´¥
+				IsSuccess = false;
 			}
 
-			// Èô»ñÈ¡³É¹¦
+			// è‹¥è·å–æˆåŠŸ
 			else
 			{
-				// ÈôÊı¾İÎª¿Õ
+				// è‹¥æ•°æ®ä¸ºç©º
 				if (!nRow)
 				{
-					// ·µ»Ø0¸öÊı¾İ
+					// è¿”å›0ä¸ªæ•°æ®
 					Count = 0;
 
-					// ·µ»Ø»ñÈ¡Ê§°Ü
-					IsSuccess = FALSE;
+					// è¿”å›è·å–å¤±è´¥
+					IsSuccess = false;
 				}
 
-				// ÈôÊı¾İ²»Îª¿Õ
+				// è‹¥æ•°æ®ä¸ä¸ºç©º
 				else
 				{
-					// µÃµ½Êı¾İ¸öÊı
+					// å¾—åˆ°æ•°æ®ä¸ªæ•°
 					Count = nRow;
 
-					// ÊÍ·Å×ÊÔ´
+					// é‡Šæ”¾èµ„æº
 					if (errMsg != NULL)
 					{
 						sqlite3_free(errMsg);
 					}
 
-					// ·µ»Ø»ñÈ¡³É¹¦
-					IsSuccess = TRUE;
+					// è¿”å›è·å–æˆåŠŸ
+					IsSuccess = true;
 				}
 			}
 
-			//ÊÍ·Å²éÑ¯½á¹û(ÎŞÂÛ²éÑ¯ÊÇ·ñ³É¹¦)
+			//é‡Šæ”¾æŸ¥è¯¢ç»“æœ(æ— è®ºæŸ¥è¯¢æ˜¯å¦æˆåŠŸ)
 			sqlite3_free_table(pRes);
 		}
 		catch (...)
 		{
-			// µ¯³ö´íÎóĞÅÏ¢
-			if(!Console)
-				AfxMessageBox(_T("ÎŞ·¨´ÓÊı¾İ¿âÖĞ»ñµÃ±íÃû!"));
-			else
-				std::cout<<"ÎŞ·¨´ÓÊı¾İ¿âÖĞ»ñµÃ±íÃû!"<<std::endl;
+			// å¼¹å‡ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"æ— æ³•ä»æ•°æ®åº“ä¸­è·å¾—è¡¨å!"<<std::endl;
 
-			// ·µ»Ø0¸öÊı¾İ
+			// è¿”å›0ä¸ªæ•°æ®
 			Count = 0;
 
-			// ·µ»Ø»ñÈ¡Ê§°Ü
-			return FALSE;
+			// è¿”å›è·å–å¤±è´¥
+			return false;
 		}
 
-		// ·µ»Ø²Ù×÷½á¹û
+		// è¿”å›æ“ä½œç»“æœ
 		return IsSuccess;
 	}
 
-	// Ä¬ÈÏ·µ»Ø»ñÈ¡Ê§°Ü
-	return FALSE;
+	// é»˜è®¤è¿”å›è·å–å¤±è´¥
+	return false;
 }
 
 
-// ÏòÄ¿±êÊı¾İ±íÖĞµ¼ÈëÊı¾İÏî
-BOOL CSqliteManager::ImportData (CString TableName, CString TargetTableName, CString Params, bool Console)
+// é‡ç½®ç›®æ ‡æ•°æ®è¡¨æ•°æ®æ•°ç¼–å·
+bool CSqliteManager::Truncate  (string TableName)
 {
-	return true;
-}
-
-
-// ´ÓÄ¿±êÊı¾İ±íÖĞµ¼³öÊı¾İÏî
-BOOL CSqliteManager::ExportData (CString TableName, CString TargetTableName, CString Params, bool Console)
-{
-	return true;
-}
-
-
-// É¾³ıÄ¿±êÊı¾İ±íÖĞĞĞ¾İÊıÏî
-BOOL CSqliteManager::DeleteRowData(CString TableName, int Row, bool Console)
-{
-	return true;
-}
-
-
-// É¾³ıÄ¿±êÊı¾İ±íÖĞÁĞ¾İÊıÏî
-BOOL CSqliteManager::DeleteColData(CString TableName, int Col, bool Console)
-{
-	return true;
-}
-
-
-// É¾³ıÄ¿±êÊı¾İ±íÖĞ³õ¾İÊıÏî
-BOOL CSqliteManager::DeleteMinData(CString TableName, bool Console)
-{
-	return true;
-}
-
-
-// É¾³ıÄ¿±êÊı¾İ±íÖĞ¼ä¾İÊıÏî
-BOOL CSqliteManager::DeleteMidData(CString TableName, bool Console)
-{
-	return true;
-}
-
-
-// É¾³ıÄ¿±êÊı¾İ±íÖĞÄ©¾İÊıÏî
-BOOL CSqliteManager::DeleteMaxData(CString TableName, bool Console)
-{
-	return true;
-}
-
-
-// ĞŞ¸ÄÄ¿±êÊı¾İ±íÖĞĞĞ¾İÊıÏî
-BOOL CSqliteManager::UpdataRowData(CString TableName, int Row, CString UpdataData, bool Console)
-{
-	return true;
-}
-
-
-// ĞŞ¸ÄÄ¿±êÊı¾İ±íÖĞÁĞ¾İÊıÏî
-BOOL CSqliteManager::UpdataColData(CString TableName, int Col, CString UpdataData, bool Console)
-{
-	return true;
-}
-
-
-// ĞŞ¸ÄÄ¿±êÊı¾İ±íÖĞ³õ¾İÊıÏî
-BOOL CSqliteManager::UpdataMinData(CString TableName, CString UpdataData, bool Console)
-{
-	return true;
-}
-
-
-// ĞŞ¸ÄÄ¿±êÊı¾İ±íÖĞ¼ä¾İÊıÏî
-BOOL CSqliteManager::UpdataMidData(CString TableName, CString UpdataData, bool Console)
-{
-	return true;
-}
-
-
-// ĞŞ¸ÄÄ¿±êÊı¾İ±íÖĞÄ©¾İÊıÏî
-BOOL CSqliteManager::UpdataMaxData(CString TableName, CString UpdataData, bool Console)
-{
-	return true;
-}
-
-
-// ¼ìË÷Ä¿±êÊı¾İ±íÖĞĞĞ¾İÊıÏî
-BOOL CSqliteManager::SelectRowData(CString TableName, int Row, CString &RowData, bool Console)
-{
-	return true;
-}
-
-
-// ¼ìË÷Ä¿±êÊı¾İ±íÖĞÁĞ¾İÊıÏî
-BOOL CSqliteManager::SelectColData(CString TableName, int Col, CString &ColData, bool Console)
-{
-	return true;
-}
-
-
-// ¼ìË÷Ä¿±êÊı¾İ±íÖĞ³õ¾İÊıÏî
-BOOL CSqliteManager::SelectMinData(CString TableName, CString &MinData, bool Console)
-{
-	return true;
-}
-
-
-// ĞŞ¸ÄÄ¿±êÊı¾İ±íÖĞ¼ä¾İÊıÏî
-BOOL CSqliteManager::SelectMidData(CString TableName, CString &MidData, bool Console)
-{
-	return true;
-}
-
-
-// ¼ìË÷Ä¿±êÊı¾İ±íÖĞÄ©¾İÊıÏî
-BOOL CSqliteManager::SelectMaxData(CString TableName, CString &MaxData, bool Console)
-{
-	return true;
-}
-
-
-// ÎªÄ¿±êÊı¾İ±íÖĞ¾İÊıÏîÅÅĞò
-BOOL CSqliteManager::SelectSortData(CString TableName, int Sort, CString &SortData, bool Console)
-{
-	return true;
-}
-
-
-// ÖØĞÂÅÅÁĞÊı¾İ±í¾İÊıÏîË³Ğò
-BOOL CSqliteManager::ChangeSortData(CString TableName, int Sort, bool Console)
-{
-	return true;
-}
-
-
-// ´ÓÄ¿±êÊı¾İ±íÖĞÉ¸Ñ¡Êı¾İÏî
-BOOL CSqliteManager::FilterData(CString TableName, CString Params, CString &FilterData, bool Console)
-{
-	return true;
-}
-
-
-// ´ÓÄ¿±êÊı¾İ±íÖĞµÃµ½Ëæ»úÊı¾İÏî
-BOOL CSqliteManager::RanData(CString TableName, CString Params, CString &RanData, bool Console)
-{
-	return true;
-}
-
-
-///////////////////////////////////Êı¾İÏî¼ÆËã´úÂë////////////////////////////////////////////////////
-
-
-// ´ÓÄ¿±êÊı¾İ±íÖĞÇóÊı¾İÏîºÍ
-BOOL CSqliteManager::SumData(CString TableName, CString Column, CString Params, int &SumData, bool Console)
-{
-	// Á´±í¶ÔÏó
-	vector<CString> Result;
-
-	// ²éÑ¯Êı¾İ
-	if(!SelectData(TableName, Result, Params, Console))
+	// è‹¥æ•°æ®åº“æœªè¿æ¥æˆåŠŸ
+	if (!IsConnect)
 	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("²éÑ¯Êı¾İ²Ù×÷Ê§°Ü!"));
-		else
-			std::cout<<"²éÑ¯Êı¾İ²Ù×÷Ê§°Ü!"<<std::endl;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æ•°æ®åº“æœªè¿æ¥ï¼Œè¯·å…ˆè¿æ¥æ•°æ®åº“!"<<std::endl;
 
-		return FALSE;
-	}
-	
-	// »ñÈ¡ÁĞÃû
-	CString ColName;
-	GetColName(TableName, ColName, true);
-
-	// ·Ö¸î×Ö·û´®
-	CStringArray pArray;
-	Split(ColName, _T(";"), pArray);
-
-	// Æ¥ÅäÁĞ
-	int col = 0, size = (int)pArray.GetSize();
-	for(int c = 0; c < size; c++)
-	{
-		if(pArray.GetAt(c) == Column)
-			col = c;
-	}
-
-	//´ÓÕâÀï¿ªÊ¼½øĞĞ×ª»¯£¬ÕâÊÇÒ»¸öºê¶¨Òå
-	USES_CONVERSION;
-
-	// ³õÊ¼»¯
-	SumData = 0;
-
-	// Ñ­»·Ïà¼Ó
-	for(int i = 0; i < (int)Result.size(); i += size -1)
-	{
-		const char* temp = T2A(Result.at(i + col).GetBuffer(0));
-		Result.at(i + col).ReleaseBuffer();
-
-		// ×ª»»ÀàĞÍ²¢ÇóºÍ
-		int value = atoi(temp);
-		SumData += value;
-	}
-
-	//·µ»Ø²éÑ¯³É¹¦ 
-	return TRUE;
-}
-
-
-// ´ÓÄ¿±êÊı¾İ±íÖĞÇóÊı¾İÏî»ı
-BOOL CSqliteManager::ProductData(CString TableName, CString Column, CString Params, int &ProductData, bool Console)
-{
-	// Á´±í¶ÔÏó
-	vector<CString> Result;
-
-	// ²éÑ¯Êı¾İ
-	if(!SelectData(TableName, Result, Params, Console))
-	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("²éÑ¯Êı¾İ²Ù×÷Ê§°Ü!"));
-		else
-			std::cout<<"²éÑ¯Êı¾İ²Ù×÷Ê§°Ü!"<<std::endl;
-
-		return FALSE;
-	}
-	
-	// »ñÈ¡ÁĞÃû
-	CString ColName;
-	GetColName(TableName, ColName, true);
-
-	// ·Ö¸î×Ö·û´®
-	CStringArray pArray;
-	Split(ColName, _T(";"), pArray);
-
-	// Æ¥ÅäÁĞ
-	int col = 0, size = (int)pArray.GetSize();
-	for(int c = 0; c < size; c++)
-	{
-		if(pArray.GetAt(c) == Column)
-			col = c;
-	}
-
-	//´ÓÕâÀï¿ªÊ¼½øĞĞ×ª»¯£¬ÕâÊÇÒ»¸öºê¶¨Òå
-	USES_CONVERSION;
-
-	// ³õÊ¼»¯
-	ProductData = 1;
-
-	// Ñ­»·Ïà¼Ó
-	for(int i = 0; i < (int)Result.size(); i += size -1)
-	{
-		const char* temp = T2A(Result.at(i + col).GetBuffer(0));
-		Result.at(i + col).ReleaseBuffer();
-
-		// ×ª»»ÀàĞÍ²¢ÇóºÍ
-		int value = atoi(temp);
-		ProductData *= value;
-	}
-
-	//·µ»Ø²éÑ¯³É¹¦ 
-	return TRUE;
-}
-
-
-// ´ÓÄ¿±êÊı¾İ±íÖĞÇóÊı¾İÏîÆ½¾ùÊı
-BOOL CSqliteManager::AvgData(CString TableName, CString Column, CString Params, int &AvgData, bool Console)
-{
-	// Á´±í¶ÔÏó
-	vector<CString> Result;
-
-	// ²éÑ¯Êı¾İ
-	if(!SelectData(TableName, Result, Params, Console))
-	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("²éÑ¯Êı¾İ²Ù×÷Ê§°Ü!"));
-		else
-			std::cout<<"²éÑ¯Êı¾İ²Ù×÷Ê§°Ü!"<<std::endl;
-
-		return FALSE;
-	}
-	
-	// ÏÈ³õÊ¼»¯²¢ÇóºÍ
-	int value = 0;
-	AvgData   = 0;
-
-	SumData(TableName, Column, Params, value, Console);
-
-	// »ñÈ¡ÁĞÃû
-	CString ColName;
-	GetColName(TableName, ColName, true);
-
-	// ·Ö¸î×Ö·û´®
-	CStringArray pArray;
-	Split(ColName, _T(";"), pArray);
-
-	// ÇóÆ½¾ùÊı
-	AvgData = value / ( (int)Result.size() / (int)pArray.GetSize() -1 );
-
-	//·µ»Ø²éÑ¯³É¹¦ 
-	return TRUE;
-}
-
-
-// ´ÓÄ¿±êÊı¾İ±íÖĞÇóÊı¾İÏîÖĞÎ»Êı
-BOOL CSqliteManager::MidData(CString TableName, CString Column, CString Params, int &MidData, bool Console)
-{
-	// Á´±í¶ÔÏó
-	vector<CString> Result;
-
-	// ²éÑ¯Êı¾İ
-	if(!SelectData(TableName, Result, Params, Console))
-	{
-		// ÌáÊ¾´íÎóĞÅÏ¢
-		if(!Console)
-			AfxMessageBox(_T("²éÑ¯Êı¾İ²Ù×÷Ê§°Ü!"));
-		else
-			std::cout<<"²éÑ¯Êı¾İ²Ù×÷Ê§°Ü!"<<std::endl;
-
-		return FALSE;
-	}
-
-	// ³õÊ¼»¯
-	MidData = 0;
-
-	// ÉıĞòÅÅĞò
-	sort(Result.begin(), Result.end());
-
-	// »ñÈ¡ÁĞÃû
-	CString ColName;
-	GetColName(TableName, ColName, true);
-
-	// ·Ö¸î×Ö·û´®
-	CStringArray pArray;
-	Split(ColName, _T(";"), pArray);
-
-	// µÃµ½ÓĞ¼¸ÌõÊı¾İ
-	int count = Result.size() / (pArray.GetSize() -1);
-
-	//´ÓÕâÀï¿ªÊ¼½øĞĞ×ª»¯£¬ÕâÊÇÒ»¸öºê¶¨Òå
-	USES_CONVERSION;
-
-	//È¡Ä£
-	if( Result.size() % 2 == 0 )
-	{
-		// Å¼Êı
-		int num = count / 2;
-
-		// ×ª»»ÀàĞÍ
-		const char* temp1 = T2A(Result.at(num).GetBuffer(0));
-		Result.at(num).ReleaseBuffer();
-
-		const char* temp2 = T2A(Result.at(num +1).GetBuffer(0));
-		Result.at(num +1).ReleaseBuffer();
-
-		// ÇóÖĞÎ»Êı
-		MidData = ( atoi(temp1) + atoi(temp2) ) / 2;
+		// è¿”å›ä¿®æ”¹å¤±è´¥ä¿¡æ¯
+		return false;
 	}
 	else
 	{
-		// ÆæÊı
+		// å°è¯•æ‰§è¡Œä¿®æ”¹æ•°æ®çš„æ“ä½œ
+		try
+		{
+			// åˆå§‹åŒ–SQLè¯­å¥
+			string Truncate_SQL = "DELETE FROM sqlite_sequence WHERE name='" + TableName + "';";
+
+			//æ•°æ®åº“å¯åŠ¨ä¸€ä¸ªäº‹ç‰©
+			if (!transaction(db))
+			{
+				std::cout<<"æ— æ³•å¯åŠ¨äº‹åŠ¡å¤„ç†!"<<std::endl;
+
+				return false;
+			}
+
+			// è‹¥ä¿®æ”¹æ“ä½œå¤±è´¥
+			if (sqlite3_exec(db, Truncate_SQL.c_str(), NULL, NULL, &errMsg) != SQLITE_OK)
+			{
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<sqlite3_errmsg(db)<<std::endl;
+
+				// è¿”å›ä¿®æ”¹å¤±è´¥ä¿¡æ¯
+				return false;
+			}
+
+			//æäº¤äº‹åŠ¡
+			if (commitTransaction(db) == false)
+			{
+				// å›æ»šäº‹åŠ¡
+				rollbackTransaction(db);
+
+				// æç¤ºé”™è¯¯ä¿¡æ¯
+				std::cout<<"é‡ç½®æ•°æ®ç¼–å·æ“ä½œå¤±è´¥: "<<sqlite3_errmsg(db)<<std::endl;
+
+				// è¿”å›ä¿®æ”¹å¤±è´¥ä¿¡æ¯
+				return false;
+			}
+			else
+			{
+				Truncate_SQL = "DELETE FROM '" + TableName + "';";
+				//æ•°æ®åº“å¯åŠ¨ä¸€ä¸ªäº‹ç‰©
+				if (!transaction(db))
+				{
+					std::cout<<"æ— æ³•å¯åŠ¨äº‹åŠ¡å¤„ç†!"<<std::endl;
+
+					return false;
+				}
+
+				// è‹¥ä¿®æ”¹æ“ä½œå¤±è´¥
+				if (sqlite3_exec(db, Truncate_SQL.c_str(), NULL, NULL, &errMsg) != SQLITE_OK)
+				{
+					// æç¤ºé”™è¯¯ä¿¡æ¯
+					std::cout<<sqlite3_errmsg(db)<<std::endl;
+
+					// è¿”å›ä¿®æ”¹å¤±è´¥ä¿¡æ¯
+					return false;
+				}
+
+				//æäº¤äº‹åŠ¡
+				if (commitTransaction(db) == false)
+				{
+					// å›æ»šäº‹åŠ¡
+					rollbackTransaction(db);
+
+					// æç¤ºé”™è¯¯ä¿¡æ¯
+					std::cout<<"é‡ç½®æ•°æ®ç¼–å·æ“ä½œå¤±è´¥: "<<sqlite3_errmsg(db)<<std::endl;
+
+					// è¿”å›ä¿®æ”¹å¤±è´¥ä¿¡æ¯
+					return false;
+				}
+
+				// è¿”å›ä¿®æ”¹æˆåŠŸä¿¡æ¯
+				return true;
+			}
+		}
+		catch (...)
+		{
+			// æç¤ºé”™è¯¯ä¿¡æ¯
+			std::cout<<"é‡ç½®æ•°æ®ç¼–å·æ“ä½œå¤±è´¥!"<<std::endl;
+
+			// è¿”å›ä¿®æ”¹å¤±è´¥ä¿¡æ¯
+			return false;
+		}
+	}
+
+	// é»˜è®¤è¿”å›ä¿®æ”¹å¤±è´¥ä¿¡æ¯
+	return false;
+}
+
+
+///////////////////////////////////æ•°æ®é¡¹è®¡ç®—ä»£ç ////////////////////////////////////////////////////
+
+
+// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æ±‚æ•°æ®é¡¹å’Œ
+bool CSqliteManager::SumData(string TableName, string Column, string Params, double &SumData)
+{
+	// é“¾è¡¨å¯¹è±¡
+	vector<string> Result;
+
+	// æŸ¥è¯¢æ•°æ®
+	if(!SelectData(TableName, Result, Params))
+	{
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æŸ¥è¯¢æ•°æ®æ“ä½œå¤±è´¥!"<<std::endl;
+
+		return false;
+	}
+
+	// è·å–åˆ—å
+	string ColName;
+	GetColName(TableName, ColName);
+
+	// åˆ†å‰²å­—ç¬¦ä¸²
+	vector<string> pArray;
+	Split(ColName, pArray, ";");
+
+	// åŒ¹é…åˆ—
+	int col = 0, size = pArray.size();
+	for(int c = 0; c < size; c++)
+	{
+		if(pArray.at(c) == Column)
+		{
+			col = c;
+			break;
+		}
+	}
+
+	//ä»è¿™é‡Œå¼€å§‹è¿›è¡Œè½¬åŒ–ï¼Œè¿™æ˜¯ä¸€ä¸ªå®å®šä¹‰
+	//USES_CONVERSION;
+
+	// åˆå§‹åŒ–
+	SumData = 0;
+
+	// å¾ªç¯ç›¸åŠ 
+	for(unsigned int i = 0; i < Result.size(); i += size)
+	{
+		/*const char* temp = T2A(Result.at(i + col).GetBuffer(0));
+		Result.at(i + col).ReleaseBuffer();*/
+
+		// è½¬æ¢ç±»å‹å¹¶æ±‚å’Œ
+		double value = atof(Result.at(i + col).c_str());
+		SumData += value;
+	}
+
+	//è¿”å›æŸ¥è¯¢æˆåŠŸ 
+	return true;
+}
+
+
+// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æ±‚æ•°æ®é¡¹ç§¯
+bool CSqliteManager::ProductData(string TableName, string Column, string Params, double &ProductData)
+{
+	// é“¾è¡¨å¯¹è±¡
+	vector<string> Result;
+
+	// æŸ¥è¯¢æ•°æ®
+	if(!SelectData(TableName, Result, Params))
+	{
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æŸ¥è¯¢æ•°æ®æ“ä½œå¤±è´¥!"<<std::endl;
+
+		return false;
+	}
+	
+	// è·å–åˆ—å
+	string ColName;
+	GetColName(TableName, ColName);
+
+	// åˆ†å‰²å­—ç¬¦ä¸²
+	vector<string> pArray;
+	Split(ColName, pArray, ";");
+
+	// åŒ¹é…åˆ—
+	int col = 0, size = pArray.size();
+	for(int c = 0; c < size; c++)
+	{
+		if(pArray.at(c) == Column)
+			col = c;
+	}
+
+	// åˆå§‹åŒ–
+	ProductData = 1;
+
+	// å¾ªç¯ç›¸åŠ 
+	for(unsigned int i = 0; i < Result.size(); i += size)
+	{
+		// è½¬æ¢ç±»å‹å¹¶æ±‚å’Œ
+		double value = atof(Result.at(i + col).c_str());
+		ProductData *= value;
+	}
+
+	//è¿”å›æŸ¥è¯¢æˆåŠŸ 
+	return true;
+}
+
+
+// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æ±‚æ•°æ®é¡¹å¹³å‡æ•°
+bool CSqliteManager::AvgData(string TableName, string Column, string Params, double &AvgData)
+{
+	// é“¾è¡¨å¯¹è±¡
+	vector<string> Result;
+
+	// æŸ¥è¯¢æ•°æ®
+	if(!SelectData(TableName, Result, Params))
+	{
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æŸ¥è¯¢æ•°æ®æ“ä½œå¤±è´¥!"<<std::endl;
+
+		return false;
+	}
+	
+	// å…ˆåˆå§‹åŒ–å¹¶æ±‚å’Œ
+	int Number   = 0;
+	double value = 0;
+	AvgData      = 0;
+
+	SumData(TableName, Column, Params, value);
+	CountColName(TableName, Number);
+
+	// æ±‚å¹³å‡æ•°
+	AvgData = value / ( Result.size() / Number);
+
+	//è¿”å›æŸ¥è¯¢æˆåŠŸ 
+	return true;
+}
+
+
+// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æ±‚æ•°æ®é¡¹ä¼—æ•°
+bool CSqliteManager::PluData(string TableName, string Column, string Params, double &PluData)
+{
+	// é“¾è¡¨å¯¹è±¡
+	vector<string> Result;
+	vector<double>  Values;
+
+	// æŸ¥è¯¢æ•°æ®
+	if(!SelectData(TableName, Result, Params))
+	{
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æŸ¥è¯¢æ•°æ®æ“ä½œå¤±è´¥!"<<std::endl;
+
+		return false;
+	}
+
+	// åˆå§‹åŒ–
+	PluData = 0;
+
+	// è·å–åˆ—å
+	string ColName;
+	GetColName(TableName, ColName);
+
+	// åˆ†å‰²å­—ç¬¦ä¸²
+	vector<string> pArray;
+	Split(ColName, pArray, ";");
+
+	// åŒ¹é…åˆ—
+	int col = 0, size = pArray.size();
+	for(int c = 0; c < size; c++)
+	{
+		if(pArray.at(c) == Column)
+			col = c;
+	}
+
+	// å¾ªç¯å–å€¼
+	for(unsigned int i = 0; i < Result.size(); i += size)
+	{
+		// è½¬æ¢ç±»å‹
+		double value = atof(Result.at(i + col).c_str());
+		
+		// ä¿å­˜ç»“æœ
+		Values.push_back(value);
+	}
+
+	// å‡åºæ’åº
+	sort(Values.begin(), Values.end());
+
+	// å‡ºç°æ¬¡æ•° & æœ€å¤§ä¼—æ•° & ä¼—æ•°ä¸‹æ ‡
+	int count = 0, max = 0, index = 0;
+
+	// éå†ç»“æœ
+	for(unsigned int j = 0; j < Values.size(); j++)
+	{
+		// è®°å½•å‡ºç°æ¬¡æ•°,å­˜åœ¨è¿ç»­ä¸¤ä¸ªæ•°ç›¸ç­‰ï¼Œåˆ™å½“å‰ä¼—æ•°+1
+		if(Values[j] == Values[j +1])
+		{
+			count++;
+		}
+		else
+		{
+			// å……å€¼è®¡æ•°
+			count = 0;
+		}
+
+		// å¦‚æœå½“å‰ä¼—æ•°è¶…è¿‡æœ€å¤§ä¼—æ•°åˆ™æ›¿æ¢
+		if(count > max)
+		{
+			max = count;
+			index = j;
+		}
+	}
+
+	// ä¸å­˜åœ¨ä¼—æ•°
+	if(max == 0)
+	{
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"ä¼—æ•°ä¸å­˜åœ¨!"<<std::endl;
+	}
+	else
+	{
+		// æ±‚å‡ºä¼—æ•°
+		PluData = Values[index];
+	}
+
+	//è¿”å›æŸ¥è¯¢æˆåŠŸ
+	return true;
+}
+
+
+// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æ±‚æ•°æ®é¡¹ä¸­ä½æ•°
+bool CSqliteManager::MidData(string TableName, string Column, string Params, double &MidData)
+{
+	// é“¾è¡¨å¯¹è±¡
+	vector<string> Result;
+	vector<double>  Values;
+
+	// æŸ¥è¯¢æ•°æ®
+	if(!SelectData(TableName, Result, Params))
+	{
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æŸ¥è¯¢æ•°æ®æ“ä½œå¤±è´¥!"<<std::endl;
+
+		return false;
+	}
+
+	// åˆå§‹åŒ–
+	MidData = 0;
+
+	// è·å–åˆ—å
+	string ColName;
+	GetColName(TableName, ColName);
+
+	// åˆ†å‰²å­—ç¬¦ä¸²
+	vector<string> pArray;
+	Split(ColName, pArray, ";");
+
+	// åŒ¹é…åˆ—
+	int col = 0, size = pArray.size();
+	for(int c = 0; c < size; c++)
+	{
+		if(pArray.at(c) == Column)
+			col = c;
+	}
+
+	// å¾ªç¯å–å€¼
+	for(unsigned int i = 0; i < Result.size(); i += size)
+	{
+		// è½¬æ¢ç±»å‹
+		double value = atof(Result.at(i + col).c_str());
+		
+		// ä¿å­˜ç»“æœ
+		Values.push_back(value);
+	}
+
+	// å‡åºæ’åº
+	sort(Values.begin(), Values.end());
+
+	// å¾—åˆ°æœ‰å‡ æ¡æ•°æ®
+	int count = Values.size();
+
+	//å–æ¨¡
+	if( count % 2 == 0 )
+	{
+		// å¶æ•°
+		int num = count / 2;
+
+		// æ±‚ä¸­ä½æ•°
+		MidData = ( Values.at(num -1) + Values.at(num) ) / 2;
+	}
+	else
+	{
+		// å¥‡æ•°
 		int num = (count +1) / 2;
 
-		// ×ª»»ÀàĞÍ
-		const char* temp = T2A(Result.at(num).GetBuffer(0));
-		Result.at(num).ReleaseBuffer();
-
-		// ÇóÖĞÎ»Êı
-		MidData = atoi(temp);
+		// æ±‚ä¸­ä½æ•°
+		MidData =  Values.at(num -1);
 	}
 
-	//·µ»Ø²éÑ¯³É¹¦
-	return TRUE;
-}
-
-
-// ´ÓÄ¿±êÊı¾İ±íÖĞÇóÊı¾İÏî×î´óÖµ
-BOOL CSqliteManager::MaxData(CString TableName, CString Column, CString Params, int &AbsData, bool Console)
-{
+	//è¿”å›æŸ¥è¯¢æˆåŠŸ
 	return true;
 }
 
 
-// ´ÓÄ¿±êÊı¾İ±íÖĞÇóÊı¾İÏî×îĞ¡Öµ
-BOOL CSqliteManager::MinData(CString TableName, CString Column, CString Params, int &AbsData, bool Console)
+// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æ±‚æ•°æ®é¡¹æœ€å¤§å€¼
+bool CSqliteManager::MaxData(string TableName, string Column, string Params, double &MaxData)
 {
+	// é“¾è¡¨å¯¹è±¡
+	vector<string> Result;
+	vector<double>  Values;
+
+	// æŸ¥è¯¢æ•°æ®
+	if(!SelectData(TableName, Result, Params))
+	{
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æŸ¥è¯¢æ•°æ®æ“ä½œå¤±è´¥!"<<std::endl;
+
+		return false;
+	}
+
+	// åˆå§‹åŒ–
+	MaxData = 0;
+
+	// è·å–åˆ—å
+	string ColName;
+	GetColName(TableName, ColName);
+
+	// åˆ†å‰²å­—ç¬¦ä¸²
+	vector<string> pArray;
+	Split(ColName, pArray, ";");
+
+	// åŒ¹é…åˆ—
+	int col = 0, size = pArray.size();
+	for(int c = 0; c < size; c++)
+	{
+		if(pArray.at(c) == Column)
+			col = c;
+	}
+
+	// å¾ªç¯å–å€¼
+	for(unsigned int i = 0; i < Result.size(); i += size)
+	{
+		// è½¬æ¢ç±»å‹
+		double value = atof(Result.at(i + col).c_str());
+		
+		// ä¿å­˜ç»“æœ
+		Values.push_back(value);
+	}
+
+	// é™åºæ’åº
+	sort(Values.rbegin(), Values.rend());
+
+	// æ±‚æœ€å¤§å€¼
+	MaxData = Values.at(0);
+
+	//è¿”å›æŸ¥è¯¢æˆåŠŸ
 	return true;
 }
 
 
-// ´ÓÄ¿±êÊı¾İ±íÖĞÈ¡Êı¾İÏîËæ»úÊı
-BOOL RanData(CString TableName, CString Column, CString Params, int &RanData, bool Console)
+// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­æ±‚æ•°æ®é¡¹æœ€å°å€¼
+bool CSqliteManager::MinData(string TableName, string Column, string Params, double &MinData)
 {
+	// é“¾è¡¨å¯¹è±¡
+	vector<string> Result;
+	vector<double>  Values;
+
+	// æŸ¥è¯¢æ•°æ®
+	if(!SelectData(TableName, Result, Params))
+	{
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æŸ¥è¯¢æ•°æ®æ“ä½œå¤±è´¥!"<<std::endl;
+
+		return false;
+	}
+
+	// åˆå§‹åŒ–
+	MinData = 0;
+
+	// è·å–åˆ—å
+	string ColName;
+	GetColName(TableName, ColName);
+
+	// åˆ†å‰²å­—ç¬¦ä¸²
+	vector<string> pArray;
+	Split(ColName, pArray, ";");
+
+	// åŒ¹é…åˆ—
+	int col = 0, size = pArray.size();
+	for(int c = 0; c < size; c++)
+	{
+		if(pArray.at(c) == Column)
+			col = c;
+	}
+
+	// å¾ªç¯å–å€¼
+	for(unsigned int i = 0; i < Result.size(); i += size)
+	{
+		// è½¬æ¢ç±»å‹
+		double value = atof(Result.at(i + col).c_str());
+		
+		// ä¿å­˜ç»“æœ
+		Values.push_back(value);
+	}
+
+	// å‡åºæ’åº
+	sort(Values.begin(), Values.end());
+
+	// æ±‚æœ€å°å€¼
+	MinData = Values.at(0);
+
+	//è¿”å›æŸ¥è¯¢æˆåŠŸ
 	return true;
 }
 
 
-///////////////////////////////////±àÂëÀàĞÍ×ª»»´úÂë///////////////////////////////////
-
-
-// ACSII   ±àÂë×ª Unicode ±àÂë  
-wstring CSqliteManager::AcsiiToUnicode(const string  &acsii_string)
+// ä»ç›®æ ‡æ•°æ®è¡¨ä¸­å–æ•°æ®é¡¹éšæœºæ•°
+bool CSqliteManager::RandData(string TableName, string Column, string Params, int &RanData)
 {
-	wstring unicode_string;
+	// é“¾è¡¨å¯¹è±¡
+	vector<string> Result;
+	vector<int>  Values;
 
-	//CP_ACP - default to ANSI code page  
-	int len = MultiByteToWideChar(CP_ACP, 0, acsii_string.c_str(), -1, NULL, 0);
-	if (ERROR_NO_UNICODE_TRANSLATION == len || 0 == len)
+	// æŸ¥è¯¢æ•°æ®
+	if(!SelectData(TableName, Result, Params))
 	{
-		//return empty wstring  
-		return unicode_string;
+		// æç¤ºé”™è¯¯ä¿¡æ¯
+		std::cout<<"æŸ¥è¯¢æ•°æ®æ“ä½œå¤±è´¥!"<<std::endl;
+
+		return false;
 	}
 
-	vector<wchar_t> vec_result(len);
-	int result_len = MultiByteToWideChar(CP_ACP, 0, acsii_string.c_str(), -1, &vec_result[0], len);
-	if (result_len != len)
+	// åˆå§‹åŒ–
+	RanData = 0;
+
+	// è·å–åˆ—å
+	string ColName;
+	GetColName(TableName, ColName);
+
+	// åˆ†å‰²å­—ç¬¦ä¸²
+	vector<string> pArray;
+	Split(ColName, pArray, ";");
+
+	// åŒ¹é…åˆ—
+	int col = 0, size = pArray.size();
+	for(int c = 0; c < size; c++)
 	{
-		//return empty wstring  
-		return unicode_string;
+		if(pArray.at(c) == Column)
+			col = c;
 	}
 
-	unicode_string = wstring(&vec_result[0]);
-	return unicode_string;
-}
-
-
-// ACSII   ±àÂë×ª UTF8    ±àÂë
-string  CSqliteManager::AcsiiToUtf8(   const string  &acsii_string)
-{
-	wstring unicode_string = AcsiiToUnicode(acsii_string);  //½« ACSII   ±àÂë×ª»»Îª Unicode  ±àÂë
-	string  utf8_string = UnicodeToUtf8(unicode_string);    //½« Unicode ±àÂë×ª»»Îª UTF8     ±àÂë
-
-	// ·µ»Ø±àÂë×ª»»½á¹û
-	return  utf8_string;
-}
-
-
-// Unicode ±àÂë×ª ACSII   ±àÂë
-string  CSqliteManager::UnicodeToAcsii(const wstring &unicode_string)
-{
-	string acsii_string;
-
-	//CP_OEMCP - default to OEM  code page  
-	int len = WideCharToMultiByte(CP_OEMCP, 0, unicode_string.c_str(), -1, NULL, 0, NULL, NULL);
-	if (ERROR_NO_UNICODE_TRANSLATION == len || 0 == len)
+	// å¾ªç¯å–å€¼
+	for(unsigned int i = 0; i < Result.size(); i += size)
 	{
-		//return empty wstring  
-		return acsii_string;
+		// è½¬æ¢ç±»å‹
+		int value = atoi(Result.at(i + col).c_str());
+		
+		// ä¿å­˜ç»“æœ
+		Values.push_back(value);
 	}
 
-	vector<char> vec_result(len);
-	int result_len = WideCharToMultiByte(CP_OEMCP, 0, unicode_string.c_str(), -1, &vec_result[0], len, NULL, NULL);;
-	if (result_len != len)
-	{
-		//return empty wstring  
-		return acsii_string;
-	}
+	// äº§ç”Ÿéšæœºæ•°ç§å­ (åˆ©ç”¨ç³»ç»Ÿæ—¶é’Ÿï¼Œäº§ç”Ÿä¸åŒçš„éšæœºæ•°ç§å­)
+	srand((unsigned)time(NULL));
 
-	acsii_string = string(&vec_result[0]);
-	return acsii_string;
-}
+	// åœ¨æœ€å°å€¼ä¸æœ€å¤§å€¼ä¹‹é—´äº§ç”Ÿéšæœºæ•° rand()%(b-a+1)+a;
+	double Min, Max;
+	MinData(TableName, Column, Params, Min);
+	MaxData(TableName, Column, Params, Max);
+	RanData = rand()% ((int)Max - (int)Min +1) +(int)Min;
 
-
-// Unicode ±àÂë×ª UTF8    ±àÂë
-string  CSqliteManager::UnicodeToUtf8( const wstring &unicode_string)
-{
-	string utf8_string;
-
-	//CP_UTF8 - UTF-8 translation  
-	int len = WideCharToMultiByte(CP_UTF8, 0, unicode_string.c_str(), -1, NULL, 0, NULL, NULL);
-	if (0 == len)
-	{
-		//return empty wstring  
-		return utf8_string;
-	}
-
-	vector<char> vec_result(len);
-	int result_len = WideCharToMultiByte(CP_UTF8, 0, unicode_string.c_str(), -1, &vec_result[0], len, NULL, NULL);;
-	if (result_len != len)
-	{
-		//return empty wstring  
-		return utf8_string;
-	}
-
-	utf8_string = string(&vec_result[0]);
-	return utf8_string;
-}
-
-
-// UTF8    ±àÂë×ª ACSII   ±àÂë
-string  CSqliteManager::Utf8ToAcsii(   const string  &utf8_string)
-{
-	wstring unicode_string = Utf8ToUnicode(utf8_string);        //½«UTF8×ª»»ÎªUnicode  
-	string acsii_string = UnicodeToAcsii(unicode_string);   //½«Unicode×ª»»ÎªACSII  
-	return acsii_string;
-}
-
-
-// UTF8    ±àÂë×ª Unicode ±àÂë
-wstring CSqliteManager::Utf8ToUnicode( const string  &utf8_string)
-{
-	wstring unicode_string;
-
-	//CP_UTF8 - UTF-8 translation  
-	int len = MultiByteToWideChar(CP_UTF8, 0, utf8_string.c_str(), -1, NULL, 0);
-	if (ERROR_NO_UNICODE_TRANSLATION == len || 0 == len)
-	{
-		//return empty wstring  
-		return unicode_string;
-	}
-
-	vector<wchar_t> vec_result(len);
-	int result_len = MultiByteToWideChar(CP_UTF8, 0, utf8_string.c_str(), -1, &vec_result[0], len);
-	if (result_len != len)
-	{
-		//return empty wstring  
-		return unicode_string;
-	}
-
-	unicode_string = wstring(&vec_result[0]);
-	return unicode_string;
+	//è¿”å›æŸ¥è¯¢æˆåŠŸ
+	return true;
 }

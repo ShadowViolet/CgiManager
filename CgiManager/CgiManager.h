@@ -1,27 +1,50 @@
-#pragma once
+ï»¿#pragma once
 /* CGI Manager
- * ×÷Õß: ×Ï»Ô(×ÏÓ°Áú)
- * ÈÕÆÚ: 2018-6-22
- * °æÈ¨ËùÓĞ 2016 - 2018 ×ÏÓ°Áú¹¤×÷ÊÒ
+ * ä½œè€…: ç´«è¾‰(ç´«å½±é¾™)
+ * æ—¥æœŸ: 2018-6-22
+ * ç‰ˆæƒæ‰€æœ‰ 2016 - 2018 ç´«å½±é¾™å·¥ä½œå®¤
  * https://www.shadowviolet.com
  */
 
+#pragma warning(disable:4996)
+
 #include "cgic.h"
+#include "SqliteManager.h"
 
-#include <afx.h>
+using namespace std;
 #include <vector>
-using std::vector;
-
 #include <string>
+
 #include <map>
-#include <iostream>
 #include <fstream>
 #include <sstream>
 
-#include "SqliteManager.h"
+/*#ifdef  __unix or #ifdef  __unix__
+  #ifdef  __linux or #ifdef  __linux__
+  #ifdef  __FreeBSD__
+  32bit #ifdef  _WIN32ï¼ˆæˆ–è€…WIN32ï¼‰
+  64bit #ifdef  _WIN64
+ */
 
-//ÅäÖÃÎÄ¼ş¶ÁÈ¡ *********************************************************************************************************************************************************************** 
-class CConfig {  
+#ifdef _WIN32
+#include <io.h>
+#include <direct.h>
+#include <windows.h>
+#else
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <typeinfo>
+#ifndef BYTE
+#define BYTE unsigned char
+#endif
+#endif
+
+//é…ç½®æ–‡ä»¶è¯»å– *********************************************************************************************************************************************************************** 
+
+class CConfig 
+{  
     // Data  
 protected:  
     std::string m_Delimiter;  //!< separator between key and value  
@@ -30,17 +53,51 @@ protected:
   
     typedef std::map<std::string,std::string>::iterator mapi;  
     typedef std::map<std::string,std::string>::const_iterator mapci;  
-    // Methods  
-public:  
-  
-    CConfig( std::string filename,std::string delimiter = "=",std::string comment = "#" );  
-    CConfig();  
+    // Methods
+public:
+    CConfig( std::string filename,std::string delimiter = "=",std::string comment = "#" );
+    CConfig();
+
+	// linux ä¸‹ä¸“ç”¨
+	void linux_trim(char *src)
+	{
+		char *begin = src;
+		char *end = src;
+
+		while (*end++)
+		{
+		}
+
+		if(begin == end)
+			return;
+
+		while(*begin == ' ' || *begin == '\t')
+			++begin;
+		while((*end) == '\0' || *end == ' ' || *end == '\t')
+			--end;
+
+		if(begin > end)
+		{
+			*src = '\0';
+			return;
+		}
+
+		while(begin != end)
+		{
+			*src++ = *begin++;
+		}
+
+		*src++ = *end;
+		*src = '\0';
+		return;
+	}
+
     template<class T> T Read( const std::string& in_key ) const;  //!<Search for key and read value or optional default value, call as read<T>  
     template<class T> T Read( const std::string& in_key, const T& in_value ) const;  
     template<class T> bool ReadInto( T& out_var, const std::string& in_key ) const;  
     template<class T>  
     bool ReadInto( T& out_var, const std::string& in_key, const T& in_value ) const;  
-    bool FileExist(std::string filename);  
+    static bool FileExist(std::string filename);  
     void ReadFile(std::string filename,std::string delimiter = "=",std::string comment = "#" );  
   
     // Check whether key exists in CConfiguration  
@@ -79,333 +136,397 @@ public:
             Key_not_found( const std::string& key_ = std::string() )  
                 : key(key_) {} };  
 };  
-  
-  
-/* static */  
-template<class T>  
-std::string CConfig::T_as_string( const T& t )  
-{  
-    // Convert from a T to a string  
-    // Type T must support << operator  
-    std::ostringstream ost;  
-    ost << t;  
-    return ost.str();  
-}  
-  
-  
-/* static */  
-template<class T>  
-T CConfig::string_as_T( const std::string& s )  
-{  
-    // Convert from a string to a T  
-    // Type T must support >> operator  
-    T t;  
-    std::istringstream ist(s);  
-    ist >> t;  
-    return t;  
-}  
-  
-  
-/* static */  
-template<>  
-inline std::string CConfig::string_as_T<std::string>( const std::string& s )  
-{  
-    // Convert from a string to a string  
-    // In other words, do nothing  
-    return s;  
-}  
-  
-  
-/* static */  
-template<>  
-inline bool CConfig::string_as_T<bool>( const std::string& s )  
-{  
-    // Convert from a string to a bool  
-    // Interpret "false", "F", "no", "n", "0" as false  
-    // Interpret "true", "T", "yes", "y", "1", "-1", or anything else as true  
-    bool b = true;  
-    std::string sup = s;  
-    for( std::string::iterator p = sup.begin(); p != sup.end(); ++p )  
-        *p = toupper(*p);  // make string all caps  
-    if( sup==std::string("FALSE") || sup==std::string("F") ||  
-        sup==std::string("NO") || sup==std::string("N") ||  
-        sup==std::string("0") || sup==std::string("NONE") )  
-        b = false;  
-    return b;  
-}  
-  
-  
-template<class T>  
-T CConfig::Read( const std::string& key ) const  
-{  
-    // Read the value corresponding to key  
-    mapci p = m_Contents.find(key);  
-    if( p == m_Contents.end() ) throw Key_not_found(key);  
-    return string_as_T<T>( p->second );  
-}  
-  
-  
-template<class T>  
-T CConfig::Read( const std::string& key, const T& value ) const  
-{  
-    // Return the value corresponding to key or given default value  
-    // if key is not found  
-    mapci p = m_Contents.find(key);  
-    if( p == m_Contents.end() ) return value;  
-    return string_as_T<T>( p->second );  
-}  
-  
-  
-template<class T>  
-bool CConfig::ReadInto( T& var, const std::string& key ) const  
-{  
-    // Get the value corresponding to key and store in var  
-    // Return true if key is found  
-    // Otherwise leave var untouched  
-    mapci p = m_Contents.find(key);  
-    bool found = ( p != m_Contents.end() );  
-    if( found ) var = string_as_T<T>( p->second );  
-    return found;  
-}  
-  
-  
-template<class T>  
-bool CConfig::ReadInto( T& var, const std::string& key, const T& value ) const  
-{  
-    // Get the value corresponding to key and store in var  
-    // Return true if key is found  
-    // Otherwise set var to given default  
-    mapci p = m_Contents.find(key);  
-    bool found = ( p != m_Contents.end() );  
-    if( found )  
-        var = string_as_T<T>( p->second );  
-    else  
-        var = value;  
-    return found;  
-}  
-  
-  
-template<class T>  
-void CConfig::Add( const std::string& in_key, const T& value )  
-{  
-    // Add a key with given value  
-    std::string v = T_as_string( value );  
-    std::string key=in_key;  
-    trim(key);  
-    trim(v);  
-    m_Contents[key] = v;  
-    return;  
-}  
 
+
+typedef void (* PtrFun) ();
+
+class FunctionEntry
+{
+public:
+    PtrFun pFun;    
+    std::string strFun;
+};
 
 /***************************************************************************************************************************************************************************************/
 
 
-// Ê¹ÓÃËµÃ÷: ±¾³ÌĞò½«×Ô¶¯Ìí¼ÓÈë¿Úµã:cgiMain ,Çë°ÑÖ÷³ÌĞòÀïµÄÈë¿ÚµãÉ¾³ı£¬²¢¼ÓÉÏ int cgiMain(){}
+// ä½¿ç”¨è¯´æ˜: æœ¬ç¨‹åºå°†è‡ªåŠ¨æ·»åŠ å…¥å£ç‚¹:cgiMain ,è¯·æŠŠä¸»ç¨‹åºé‡Œçš„å…¥å£ç‚¹åˆ é™¤ï¼Œå¹¶åŠ ä¸Š int cgiMain(){}
+
 class CCgiManager
 {
 private:
+	//Cgi é…ç½®
+	static bool   debug;
+	static string error_message;
+	static string log_path;
+	static string charset;
+	static string return_type;
+	static string ajax_return;
+	static string controller_prefix;
+	static string controller_suffix;
+	static string default_controller;
+	static string default_action;
+	static string action_suffix;
+	static string pathinfo_depr;
+	static string html_suffix;
+	static bool   url_route;
+	static int    cookie_expire;
+	static string cookie_path;
+	static string cookie_domain;
+
+	// åˆå§‹åŒ–çŠ¶æ€
+	static bool Initialized;
+
+	// æ˜¯å¦å·²è®¾ç½®è¯·æ±‚å¤´
 	static bool IsSetHead;
 
+	// CGI é…ç½®
+	static void Config(string ConfigFile = "application/config.txt");
+
+	// è·¯ç”±é…ç½®
+	static void Route(string ConfigFile = "application/route.txt");
+
+	// è§£æUrl
+	static void ParsingUrl();
+
+	// ç¼–ç å·¥å…·
+	static void Gb2312ToUnicode(wchar_t* pOut,char *gbBuffer);
+    static void UTF_8ToUnicode(wchar_t* pOut,char *pText);
+    static void UnicodeToUTF_8(char* pOut,wchar_t* pText);
+    static void UnicodeToGB2312(char* pOut,wchar_t* uData);
+    static char CharToInt(char ch);
+    static char StrToBin(char *str);
+
 public:
-	// ¹¹ÔìÓëÕÛ¹¹º¯Êı
+	// æ„é€ ä¸æŠ˜æ„å‡½æ•°
 	CCgiManager();
-	CCgiManager(char * Type);
 	~CCgiManager();
+	friend class CController;
+
+	// è·¯ç”±è¡¨
+	static vector<string> routes;
+
+	// Urlå‚æ•°
+	static string Controller, Function;
+
+	// æ–¹æ³•æ˜ å°„
+	static map <string, map<string, PtrFun> > FunTab;
+
+	///////////////////////////////////å­—ç¬¦ä¸²æ“ä½œä»£ç ////////////////////////////////////////////////////////////////////////
 
 
-	// Ìø×ªµ½ÇëÇó·½·¨
-	static void Jump();
+	/*ä»å­—ç¬¦ä¸²çš„å·¦è¾¹æˆªå–nä¸ªå­—ç¬¦*/  
+    static char* Left(char* dst, char* src, int n);
 
-	// ÉèÖÃÍ·
-	static void SetHead(char* Type = "text/html");
+	/*ä»å­—ç¬¦ä¸²çš„ä¸­é—´æˆªå–nä¸ªå­—ç¬¦*/  
+    static char* Mid(char* dst, char* src, int n, int m);
 
-	// ÉèÖÃ Location
-	static void Location(char* Url);
+	/*ä»å­—ç¬¦ä¸²çš„å³è¾¹æˆªå–nä¸ªå­—ç¬¦*/  
+    static char* Right(char* dst, char* src, int n);
 
-	// ÖØ¶¨ÏòUrl
-	static void Redirect(char* Url, bool Visible = false);
+	// å­—ç¬¦ä¸²åˆ†å‰²
+    static void Split(const std::string& s, std::vector<std::string>& v, const std::string& c);
 
-	// Êä³öHTTP´íÎó×´Ì¬´úÂë
-	static void SetStatus(int Status, char* Message);
+	// å­—ç¬¦ä¸²æ›¿æ¢ s1é‡Œæ›¿æ¢s2ä¸s3
+    static char* Replace(char* s1, char* s2, char* s3 = NULL);
 
-	// Êä³öÄÚÈİ
-	static void OutPut(char * String, ...);
+	// è½¬å¤§å†™
+	static char* strupr(char *str);
 
-	// ×ªÂëÊä³öHtml
-	static void HtmlEscape(char * Name, bool Newlines = true);
+	// è½¬å°å†™
+	static char* strlowr(char *str);
 
-	// ×ªÂëÊä³öHtmlÊı¾İÁ÷
-	static void HtmlEscapeData(char * Name, int len, bool Newlines = true);
+	
+	///////////////////////////////////æ•°æ®ç¼–ç è½¬æ¢ä»£ç ////////////////////////////////////////////////////////////////////////
 
-	// ×ªÂëÊä³öValue
-	static void ValueEscape(char * Value, bool Newlines = true);
+	//utf_8è½¬ä¸ºgb2312
+	static void UTF_8ToGB2312(string &pOut, char *pText, int pLen);
 
-	// ×ªÂëÊä³öValueÊı¾İÁ÷
-	static void ValueEscapeData(char * Value, int len, bool Newlines = true);
+	//gb2312 è½¬utf_8
+    static void GB2312ToUTF_8(string& pOut,char *pText, int pLen);
 
-	// »ñÈ¡×Ö·û´®Êı¾İ
-	static char* InPutString(char * String, bool OutPut = false, bool Newlines = false, int Max = 0);
+	//urlgb2312ç¼–ç 
+    static string UrlGB2312(char * str);
 
-	// »ñÈ¡²»´ø»Ø³µ»»ĞĞ·ûµÄ×Ö·û´®Êı¾İ
-	static char* InPutStringNoNewlines(char * String, bool OutPut = false, bool Newlines = false, int Max = 0);
+	//urlutf8 ç¼–ç 
+    static string UrlUTF8(char * str);
 
-	// ÉèÖÃ×Ö·û´®µÄ´¢´æ¿Õ¼ä£¬ĞèºÍInPutString»òInPutStringNoNewlinesÅäºÏÊ¹ÓÃ
-	static bool InPutStringSpaceNeeded(char * String, int Length);
+	//urlutf8è§£ç 
+    static string UrlUTF8Decode(string str);
 
-	// »ñÈ¡¶ÌÕûĞÍÊı¾İ
-	static int InPutInteger(char * String,  int Default = 0, bool OutPut = false, bool Newlines = false);
-
-	// »ñÈ¡¶ÌÕûĞÍÇø¼äÊı¾İ(×î´óÖµÓë×îĞ¡ÖµÎª±ØĞë²ÎÊı)
-	static int InPutIntegerBound(char* String, int Min, int Max, int Default = 0, bool OutPut = false, bool Newlines = false);
-
-	// »ñÈ¡Ë«¾«¶ÈÊı¾İ
-	static double InPutDouble(char * String, int Default = 0, bool OutPut = false, bool Newlines = false);
-
-	// »ñÈ¡Ë«¾«¶ÈÇø¼äÊı¾İ(×î´óÖµÓë×îĞ¡ÖµÎª±ØĞë²ÎÊı)
-	static double InPutDoubleBound(char* String, double Min, double Max, double Default = 0.00, bool OutPut = false, bool Newlines = false);
-
-	// »ñÈ¡µ¥¸öCheckboxÊı¾İ(·µ»ØÊÇ·ñÑ¡ÖĞ)
-	static bool InPutCheckboxSingle(char * String);
-
-	// »ñÈ¡Ò»×éCheckboxÊı¾İ(·µ»ØËùÓĞÑ¡ÖĞÏî£¬ÈôÎŞÑ¡ÖĞÏîÔò·µ»Ø¿Õ)
-    static char * InPutCheckboxMultiple(char * String);
-
-	// »ñÈ¡Ò»×éµ¥Ñ¡SelectÊı¾İ(·µ»ØÑ¡ÖĞµÄÏî)
-	static char* InPutSelectSingle(char * String , char *texts[], int total, int Default = 0);
-
-	// »ñÈ¡Ò»×é¶àÑ¡SelectÊı¾İ(·µ»ØÑ¡ÖĞµÄÏî)
-	static bool InPutSelectMultiple(char * String, vector<char> &pResult, char *texts[], int total, int Invalid = 0);
-
-	// »ñÈ¡Ò»×éRadioÊı¾İ(·µ»ØÑ¡ÖĞµÄÏî)
-	static char* InPutRadio(char * String, char *Texts[], int Total, int Default = 0);
-
-	// »ñÈ¡SubmitÊı¾İ(Ìá½»³É¹¦·µ»ØÕæ·ñÔò·µ»Ø¼Ù)
-	static bool SubmitClicked(char * String);
-
-	// ÎªÕ¾µãÉèÖÃCookieÊı¾İ
-	static void SetCookieString(char * Name, char * Value, char* Domain = "DefaultDomain");
-	static void SetCoolieInteger(char * Name,  int  Value, char* Domain = "DefaultDomain");
-
-	// »ñÈ¡Õ¾µãCookieÊı¾İ
-	static char* GetCookieString(char * Name);
-	static int  GetCookieInteger(char * Name, int Default);
-
-	//»ñÈ¡ËùÓĞCookieÊı¾İ
-	static char * GetCookies(bool OutPut = false);
-
-	//»ñÈ¡ËùÓĞ±íµ¥Ãû³Æ(Name)
-	static char* Entries(bool OutPut = false);
-
-	// ½«±íµ¥Êı¾İ´¢´æÔÚ´ÅÅÌÀï 
-	static bool LoadEnvironment(char * FileName);
-
-	// ´Ó´ÅÅÌÀï¶ÁÈ¡±íµ¥Êı¾İ
-	static bool SaveEnvironment(char * FileName);
-
-	// »ñÈ¡ÎÄ¼şÊı¾İ
-	static bool InPutFile(char* String, char* &FileName, int &FileSize, char* &contentType);
-
-	// ¶ÁÈ¡ÎÄ¼şÊı¾İ
-	static char* ReadFileData(char* String, bool OutPut = false);
-
-	// ±£´æÎÄ¼şÊı¾İ
-	static bool SaveFileData(char* String, char* FilePath);
+	//urlgb2312è§£ç 
+    static string UrlGB2312Decode(string str);
 
 
-	// »ñÈ¡·şÎñÆ÷Èí¼şµÄÃû³Æ£¬Èç¹ûÎ´Öª£¬ÔòÖ¸Ïò¿Õ×Ö·û´®¡£
-	static char* GetServerSoftware();
+	//ACSIIè½¬Unicode
+	//static wstring AcsiiToUnicode( const string  & acsii_string);
 
-	// »ñÈ¡·şÎñÆ÷µÄÃû³Æ£¬Èç¹ûÎ´Öª£¬ÔòÖ¸Ïò¿Õ×Ö·û´®¡£
-	static char* GetServerName();
+	//ACSIIè½¬UTF8  
+	//static string  AcsiiToUtf8(    const string  & acsii_string);
 
-	// »ñÈ¡Íø¹Ø½Ó¿Ú£¨Í¨³£ÎªCGI / 1.1£©µÄÃû³Æ£¬Èç¹ûÎ´Öª£¬ÔòÖ¸Ïò¿Õ×Ö·û´®¡£
-	static char* GetGatewayInterface();
+	//Unicodeè½¬ACSII  
+	//static string  UnicodeToAcsii( const wstring & unicode_string);
 
-	// »ñÈ¡Ê¹ÓÃµÄĞ­Òé£¨Í¨³£ÎªHTTP / 1.0£©£¬Èç¹ûÎ´Öª£¬ÔòÖ¸Ïò¿Õ×Ö·û´®¡£ 
-	static char* GetServerProtocol();
+	//Unicodeè½¬UTF8  
+	//static string  UnicodeToUtf8(  const wstring & unicode_string);
 
-	// »ñÈ¡·şÎñÆ÷ÕıÔÚ¼àÌıHTTPÁ¬½Ó£¨Í¨³£Îª80£©µÄ¶Ë¿ÚºÅ£¬»òÎ´ÖªµÄ¿Õ×Ö·û´®¡£ 
-	static char* GetServerPort();
+	//UTF8è½¬ACSII 
+	//static string  Utf8ToAcsii(    const string  & utf8_string);
 
-	// »ñÈ¡ÇëÇóÖĞÊ¹ÓÃµÄ·½·¨£¨Í¨³£ÎªGET»òPOST£©£¬Èç¹ûÎ´Öª£¨Õâ²»Ó¦¸Ã·¢Éú£©£¬ÔòÎª¿Õ×Ö·û´®£©¡£ 
-	static char* GetRequestMethod();
+	//UTF8è½¬Unicode  
+	//static wstring Utf8ToUnicode(  const string  & utf8_string);
+	
 
-	// ´ó¶àÊıWeb·şÎñÆ÷ÔÚÇëÇóµÄURLÖĞÊ¶±ğ³ö³¬³öCGI³ÌĞò±¾ÉíµÄÈÎºÎ¸½¼ÓÂ·¾¶ĞÅÏ¢£¬²¢½«¸ÃĞÅÏ¢´«µİ¸ø³ÌĞò¡£cgiPathInfoÖ¸ÏòÕâ¸ö¶îÍâµÄÂ·¾¶ĞÅÏ¢¡£ 
-	static char* GetPathInfo();
+	///////////////////////////////////ç±»æˆå‘˜æ–¹æ³•ä»£ç ////////////////////////////////////////////////////////////////////////
 
-	// ´ó¶àÊıWeb·şÎñÆ÷ÔÚÇëÇóµÄURLÖĞÊ¶±ğ³ö³¬³öCGI³ÌĞò±¾ÉíµÄÈÎºÎ¸½¼ÓÂ·¾¶ĞÅÏ¢£¬²¢½«¸ÃĞÅÏ¢´«µİ¸ø³ÌĞò¡£cgiPathTranslatedÖ¸Ïò´Ë¸½¼ÓÂ·¾¶ĞÅÏ¢£¬ÓÉ·şÎñÆ÷×ª»»Îª±¾µØ·şÎñÆ÷ÉÏµÄÎÄ¼şÏµÍ³Â·¾¶¡£ 
-	static char* GetPathTranslated();
 
-	// »ñÈ¡µ÷ÓÃ³ÌĞòµÄÃû³Æ¡£ 
-	static char* GetScriptName();
+	// è®°å½•é”™è¯¯ä¿¡æ¯
+	static void Record(string Content);
 
-	// »ñÈ¡°üº¬ÓÉGET·½·¨±íµ¥»ò<ISINDEX>±êÇ©µ¼ÖÂÓÃ»§Ìá½»µÄÈÎºÎ²éÑ¯ĞÅÏ¢¡£Çë×¢Òâ£¬³ı·ÇÊ¹ÓÃ<ISINDEX>±ê¼Ç£¬·ñÔò²»ĞèÒªÖ±½Ó½âÎö´ËĞÅÏ¢; Í¨³£Ëü×Ô¶¯½âÎö¡£Ê¹ÓÃcgiFormº¯ÊıÏµÁĞ¼ìË÷Óë±íµ¥ÊäÈë×Ö¶ÎÏà¹ØµÄÖµ¡£
-	static char* GetQueryString();
+	// æ˜¾ç¤ºé”™è¯¯ä¿¡æ¯
+	static void DisplayError(string String, ...);
 
-	// »ñÈ¡ä¯ÀÀÆ÷µÄÍêÈ«½âÎöµÄÖ÷»úÃû£¨Èç¹ûÒÑÖª£©»ò¿Õ×Ö·û´®£¨Èç¹ûÎ´Öª£©¡£ 
-	static char* GetRemoteHost();
+	// è®¾ç½®å¤´
+	static void SetHead(string Type);
 
-	// »ñÈ¡ä¯ÀÀÆ÷µÄµã·ÖÊ®½øÖÆIPµØÖ·£¨Èç¹ûÒÑÖª£©»ò¿Õ×Ö·û´®£¨Èç¹ûÎ´Öª£©¡£ 
-	static char* GetRemoteAddr();
+	// è®¾ç½® Location
+	static void Location(string Url);
 
-	// »ñÈ¡ÓÃÓÚÇëÇóµÄÊÚÈ¨ÀàĞÍ£¨Èç¹ûÓĞµÄ»°£©£¬Èç¹ûÃ»ÓĞ»òÎ´Öª£¬ÔòÖ¸Ïò¿Õ×Ö·û´®¡£ 
-	static char* GetAuthType();
+	// Urlè·³è½¬
+	static void Jump(string Url, bool Visible = true);
 
-	// »ñÈ¡ÓÃ»§ÒÑ¾­ÈÏÖ¤µÄÓÃ»§Ãû; Èç¹ûÃ»ÓĞ·¢ÉúÉí·İÑéÖ¤£¬ÔòÎª¿Õ×Ö·û´®¡£ÕâĞ©ĞÅÏ¢µÄÈ·¶¨ĞÔÈ¡¾öÓÚÊ¹ÓÃÊÚÈ¨µÄÀàĞÍ; 
-	static char* GetRemoteUser();
+	// è¾“å‡ºHTTPé”™è¯¯çŠ¶æ€ä»£ç 
+	static void SetStatus(int Status, string Message);
 
-	// ÓÉÓÃ»§Í¨¹ıÓÃ»§Ê¶±ğĞ­Òé×ÔÔ¸Ö¸¶¨ÓÃ»§Ãû; Ò»¸ö¿Õ×Ö·û´®£¬Èç¹ûÎ´Öª¡£´ËĞÅÏ¢²»°²È«¡£¿ÉÒÔÓÉÓÃ»§°²×°ÔÚ²»°²È«µÄÏµÍ³£¬ÈçWindows»úÆ÷ÉÏ¡£ 
-	static char* GetRemoteIdent();
+	// è¾“å‡ºå†…å®¹
+	static void OutPut(string String, ...);
 
-	// »ñÈ¡ÓÃ»§Ìá½»µÄĞÅÏ¢µÄMIMEÄÚÈİÀàĞÍ£¨Èç¹ûÓĞ£©; Èç¹ûÃ»ÓĞÌá½»ĞÅÏ¢£¬ÔòÎª¿Õ×Ö·û´®¡£Èç¹û´Ë×Ö·û´®µÈÓÚ application/x-www-form-urlencoded»ò multipart/form-data£¬Ôò×Ô¶¯¼ì²éÌá½»µÄ±íµ¥Êı¾İ¡£Èç¹û´Ë×Ö·û´®¾ßÓĞÈÎºÎÆäËû·Ç¿ÕÖµ£¬Ôò»áÌá½»²»Í¬ÀàĞÍµÄÊı¾İ¡£ÕâÊÇ·Ç³£º±¼ûµÄ£¬ÒòÎª´ó¶àÊıä¯ÀÀÆ÷Ö»ÄÜÖ±½ÓÌá½»±íµ¥ºÍÎÄ¼şÉÏ´«¡£ 
-	static char* GetContentType();
+	// è·å¾—è¾“å…¥å­—ç¬¦
+	static string InPut(string String);
+	static int    InPut(string String, int    Default);
+	static double InPut(string String, double Default);
 
-	// »ñÈ¡Webä¯ÀÀÆ÷Ìá½»µÄÔ­Ê¼Cookie£¨ä¯ÀÀÆ÷¶ËÓÀ¾Ã´æ´¢£©Êı¾İ¡£Ó¦¸ÃÊ¹ÓÃº¯ÊıGetCookies£¬ GetCookieStringºÍ GetCookieInteger£¬¶ø²»ÊÇÖ±½Ó¼ì²éÕâ¸ö×Ö·û´®¡£ 
-	static char* GetCookie();
+	// è½¬ç è¾“å‡ºHtml
+	static void HtmlEscape(string Name, bool Newlines = true);
 
-	// »ñÈ¡ä¯ÀÀÆ÷¿ÉÒÔ½ÓÊÜµÄMIMEÄÚÈİÀàĞÍµÄ¿Õ¸ñ·Ö¸ôÁĞ±í£¨Çë²ÎÔÄ cgiHeaderContentType£¨£©£©»ò¿Õ×Ö·û´®¡£²»ĞÒµÄÊÇ£¬´ó¶àÊıµ±Ç°µÄä¯ÀÀÆ÷²¢²»ÊÇÒÔÒ»ÖÖÓĞÓÃµÄĞÎÊ½Ìá¹©Õâ¸ö±äÁ¿¡£
-	static char* GetAccept();
+	// è½¬ç è¾“å‡ºHtmlæ•°æ®æµ
+	static void HtmlEscapeData(string Name, int len, bool Newlines = true);
 
-	// »ñÈ¡ÕıÔÚÊ¹ÓÃµÄä¯ÀÀÆ÷µÄÃû³Æ£¬Èç¹û´ËĞÅÏ¢²»¿ÉÓÃ£¬ÔòÎª¿Õ×Ö·û´®¡£ 
-	static char* GetUserAgent();
+	// è½¬ç è¾“å‡ºValue
+	static void ValueEscape(string Value, bool Newlines = true);
 
-	// »ñÈ¡ÓÃ»§·ÃÎÊµÄÉÏÒ»Ò³µÄURL¡£ÕâÍ¨³£ÊÇ½«ÓÃ»§´øµ½ÄúµÄ³ÌĞòµÄ±íµ¥µÄURL¡£Çë×¢Òâ£¬±¨¸æ´ËĞÅÏ¢ÍêÈ«È¡¾öÓÚä¯ÀÀÆ÷£¬¿ÉÄÜÑ¡Ôñ²»ÕâÑù×ö¡£µ«ÊÇ£¬¸Ã±äÁ¿Í¨³£ÊÇ×¼È·µÄ¡£
-	static char* GetReferrer();
+	// è½¬ç è¾“å‡ºValueæ•°æ®æµ
+	static void ValueEscapeData(string Value, int len, bool Newlines = true);
 
-	// »ñÈ¡ÊÕµ½µÄ±íµ¥»ò²éÑ¯Êı¾İµÄ×Ö½ÚÊı¡£Çë×¢Òâ£¬Èç¹ûÌá½»ÊÇÌá½»±íµ¥»ò²éÑ¯£¬¿â½«Ö±½Ó´ÓcgiInºÍ/»òcgiQueryString¶ÁÈ¡ºÍ½âÎöËùÓĞĞÅÏ¢¡£ÔÚÕâÖÖÇé¿öÏÂ£¬³ÌĞòÔ±²»Ó¦¸ÃÕâÑù×ö¡£
+	// è·å–å­—ç¬¦ä¸²æ•°æ®
+	static string InPutString(string String, bool OutPut = false, bool Newlines = false, int Max = 0);
+
+	// è·å–ä¸å¸¦å›è½¦æ¢è¡Œç¬¦çš„å­—ç¬¦ä¸²æ•°æ®
+	static string InPutStringNoNewlines(string String, bool OutPut = false, bool Newlines = false, int Max = 0);
+
+	// è®¾ç½®å­—ç¬¦ä¸²çš„å‚¨å­˜ç©ºé—´ï¼Œéœ€å’ŒInPutStringæˆ–InPutStringNoNewlinesé…åˆä½¿ç”¨
+	static bool InPutStringSpaceNeeded(string String, int Length);
+
+	// è·å–çŸ­æ•´å‹æ•°æ®
+	static int InPutInteger(string String,  int Default = 0, bool OutPut = false, bool Newlines = false);
+
+	// è·å–çŸ­æ•´å‹åŒºé—´æ•°æ®(æœ€å¤§å€¼ä¸æœ€å°å€¼ä¸ºå¿…é¡»å‚æ•°)
+	static int InPutIntegerBound(string String, int Min, int Max, int Default = 0, bool OutPut = false, bool Newlines = false);
+
+	// è·å–åŒç²¾åº¦æ•°æ®
+	static double InPutDouble(string String, double Default = 0.00, bool OutPut = false, bool Newlines = false);
+
+	// è·å–åŒç²¾åº¦åŒºé—´æ•°æ®(æœ€å¤§å€¼ä¸æœ€å°å€¼ä¸ºå¿…é¡»å‚æ•°)
+	static double InPutDoubleBound(string String, double Min, double Max, double Default = 0.00, bool OutPut = false, bool Newlines = false);
+
+	// è·å–å•ä¸ªCheckboxæ•°æ®(è¿”å›æ˜¯å¦é€‰ä¸­)
+	static bool InPutCheckboxSingle(string String);
+
+	// è·å–ä¸€ç»„Checkboxæ•°æ®(è¿”å›æ‰€æœ‰é€‰ä¸­é¡¹ï¼Œè‹¥æ— é€‰ä¸­é¡¹åˆ™è¿”å›ç©º)
+    static string InPutCheckboxMultiple(string String);
+
+	// è·å–ä¸€ç»„å•é€‰Selectæ•°æ®(è¿”å›é€‰ä¸­çš„é¡¹)
+	static string InPutSelectSingle(string String , string texts[], int total, int Default = 0);
+
+	// è·å–ä¸€ç»„å¤šé€‰Selectæ•°æ®(è¿”å›é€‰ä¸­çš„é¡¹)
+	static bool InPutSelectMultiple(string String, vector<string> &pResult, string texts[], int total, int Invalid = 0);
+
+	// è·å–ä¸€ç»„Radioæ•°æ®(è¿”å›é€‰ä¸­çš„é¡¹)
+	static string InPutRadio(string String, string Texts[], int Total, int Default = 0);
+
+	// è·å–Submitæ•°æ®(æäº¤æˆåŠŸè¿”å›çœŸå¦åˆ™è¿”å›å‡)
+	static bool SubmitClicked(string String);
+
+	// ä¸ºç«™ç‚¹è®¾ç½®Cookieæ•°æ®
+	static void SetCookieString(string Name, string Value);
+	static void SetCoolieInteger(string Name,  int  Value);
+
+	// è·å–ç«™ç‚¹Cookieæ•°æ®
+	static string GetCookieString(string Name);
+	static int   GetCookieInteger(string Name, int Default);
+
+	//è·å–æ‰€æœ‰è¡¨å•åç§°(Name)
+	static string Entries(bool OutPut = false);
+
+	// å°†è¡¨å•æ•°æ®å‚¨å­˜åœ¨ç£ç›˜é‡Œ 
+	static bool LoadEnvironment(string FileName);
+
+	// ä»ç£ç›˜é‡Œè¯»å–è¡¨å•æ•°æ®
+	static bool SaveEnvironment(string FileName);
+
+	// è·å–æ–‡ä»¶æ•°æ®
+	static bool InPutFile(string String, string &FileName, int &FileSize, string &contentType);
+
+	// è¯»å–æ–‡ä»¶æ•°æ®
+	static string ReadFileData(string String, bool OutPut = false);
+
+	// ä¿å­˜æ–‡ä»¶æ•°æ®
+	static bool SaveFileData(string String, string FilePath);
+
+
+	// è·å–æœåŠ¡å™¨è½¯ä»¶çš„åç§°ï¼Œå¦‚æœæœªçŸ¥ï¼Œåˆ™æŒ‡å‘ç©ºå­—ç¬¦ä¸²ã€‚
+	static string GetServerSoftware();
+
+	// è·å–æœåŠ¡å™¨çš„åç§°ï¼Œå¦‚æœæœªçŸ¥ï¼Œåˆ™æŒ‡å‘ç©ºå­—ç¬¦ä¸²ã€‚
+	static string GetServerName();
+
+	// è·å–ç½‘å…³æ¥å£ï¼ˆé€šå¸¸ä¸ºCGI / 1.1ï¼‰çš„åç§°ï¼Œå¦‚æœæœªçŸ¥ï¼Œåˆ™æŒ‡å‘ç©ºå­—ç¬¦ä¸²ã€‚
+	static string GetGatewayInterface();
+
+	// è·å–ä½¿ç”¨çš„åè®®ï¼ˆé€šå¸¸ä¸ºHTTP / 1.0ï¼‰ï¼Œå¦‚æœæœªçŸ¥ï¼Œåˆ™æŒ‡å‘ç©ºå­—ç¬¦ä¸²ã€‚ 
+	static string GetServerProtocol();
+
+	// è·å–æœåŠ¡å™¨æ­£åœ¨ç›‘å¬HTTPè¿æ¥ï¼ˆé€šå¸¸ä¸º80ï¼‰çš„ç«¯å£å·ï¼Œæˆ–æœªçŸ¥çš„ç©ºå­—ç¬¦ä¸²ã€‚ 
+	static string GetServerPort();
+
+	// è·å–è¯·æ±‚ä¸­ä½¿ç”¨çš„æ–¹æ³•ï¼ˆé€šå¸¸ä¸ºGETæˆ–POSTï¼‰ï¼Œå¦‚æœæœªçŸ¥ï¼ˆè¿™ä¸åº”è¯¥å‘ç”Ÿï¼‰ï¼Œåˆ™ä¸ºç©ºå­—ç¬¦ä¸²ï¼‰ã€‚ 
+	static string GetRequestMethod();
+
+	// å¤§å¤šæ•°WebæœåŠ¡å™¨åœ¨è¯·æ±‚çš„URLä¸­è¯†åˆ«å‡ºè¶…å‡ºCGIç¨‹åºæœ¬èº«çš„ä»»ä½•é™„åŠ è·¯å¾„ä¿¡æ¯ï¼Œå¹¶å°†è¯¥ä¿¡æ¯ä¼ é€’ç»™ç¨‹åºã€‚cgiPathInfoæŒ‡å‘è¿™ä¸ªé¢å¤–çš„è·¯å¾„ä¿¡æ¯ã€‚ 
+	static string GetPathInfo();
+
+	// å¤§å¤šæ•°WebæœåŠ¡å™¨åœ¨è¯·æ±‚çš„URLä¸­è¯†åˆ«å‡ºè¶…å‡ºCGIç¨‹åºæœ¬èº«çš„ä»»ä½•é™„åŠ è·¯å¾„ä¿¡æ¯ï¼Œå¹¶å°†è¯¥ä¿¡æ¯ä¼ é€’ç»™ç¨‹åºã€‚cgiPathTranslatedæŒ‡å‘æ­¤é™„åŠ è·¯å¾„ä¿¡æ¯ï¼Œç”±æœåŠ¡å™¨è½¬æ¢ä¸ºæœ¬åœ°æœåŠ¡å™¨ä¸Šçš„æ–‡ä»¶ç³»ç»Ÿè·¯å¾„ã€‚ 
+	static string GetPathTranslated();
+
+	// è·å–è°ƒç”¨ç¨‹åºçš„åç§°ã€‚ 
+	static string GetScriptName();
+
+	// è·å–åŒ…å«ç”±GETæ–¹æ³•è¡¨å•æˆ–<ISINDEX>æ ‡ç­¾å¯¼è‡´ç”¨æˆ·æäº¤çš„ä»»ä½•æŸ¥è¯¢ä¿¡æ¯ã€‚è¯·æ³¨æ„ï¼Œé™¤éä½¿ç”¨<ISINDEX>æ ‡è®°ï¼Œå¦åˆ™ä¸éœ€è¦ç›´æ¥è§£ææ­¤ä¿¡æ¯; é€šå¸¸å®ƒè‡ªåŠ¨è§£æã€‚ä½¿ç”¨cgiFormå‡½æ•°ç³»åˆ—æ£€ç´¢ä¸è¡¨å•è¾“å…¥å­—æ®µç›¸å…³çš„å€¼ã€‚
+	static string GetQueryString();
+
+	// è·å–æµè§ˆå™¨çš„å®Œå…¨è§£æçš„ä¸»æœºåï¼ˆå¦‚æœå·²çŸ¥ï¼‰æˆ–ç©ºå­—ç¬¦ä¸²ï¼ˆå¦‚æœæœªçŸ¥ï¼‰ã€‚ 
+	static string GetRemoteHost();
+
+	// è·å–æµè§ˆå™¨çš„ç‚¹åˆ†åè¿›åˆ¶IPåœ°å€ï¼ˆå¦‚æœå·²çŸ¥ï¼‰æˆ–ç©ºå­—ç¬¦ä¸²ï¼ˆå¦‚æœæœªçŸ¥ï¼‰ã€‚ 
+	static string GetRemoteAddr();
+
+	// è·å–ç”¨äºè¯·æ±‚çš„æˆæƒç±»å‹ï¼ˆå¦‚æœæœ‰çš„è¯ï¼‰ï¼Œå¦‚æœæ²¡æœ‰æˆ–æœªçŸ¥ï¼Œåˆ™æŒ‡å‘ç©ºå­—ç¬¦ä¸²ã€‚ 
+	static string GetAuthType();
+
+	// è·å–ç”¨æˆ·å·²ç»è®¤è¯çš„ç”¨æˆ·å; å¦‚æœæ²¡æœ‰å‘ç”Ÿèº«ä»½éªŒè¯ï¼Œåˆ™ä¸ºç©ºå­—ç¬¦ä¸²ã€‚è¿™äº›ä¿¡æ¯çš„ç¡®å®šæ€§å–å†³äºä½¿ç”¨æˆæƒçš„ç±»å‹; 
+	static string GetRemoteUser();
+
+	// ç”±ç”¨æˆ·é€šè¿‡ç”¨æˆ·è¯†åˆ«åè®®è‡ªæ„¿æŒ‡å®šç”¨æˆ·å; ä¸€ä¸ªç©ºå­—ç¬¦ä¸²ï¼Œå¦‚æœæœªçŸ¥ã€‚æ­¤ä¿¡æ¯ä¸å®‰å…¨ã€‚å¯ä»¥ç”±ç”¨æˆ·å®‰è£…åœ¨ä¸å®‰å…¨çš„ç³»ç»Ÿï¼Œå¦‚Windowsæœºå™¨ä¸Šã€‚ 
+	static string GetRemoteIdent();
+
+	// è·å–ç”¨æˆ·æäº¤çš„ä¿¡æ¯çš„MIMEå†…å®¹ç±»å‹ï¼ˆå¦‚æœæœ‰ï¼‰; å¦‚æœæ²¡æœ‰æäº¤ä¿¡æ¯ï¼Œåˆ™ä¸ºç©ºå­—ç¬¦ä¸²ã€‚å¦‚æœæ­¤å­—ç¬¦ä¸²ç­‰äº application/x-www-form-urlencodedæˆ– multipart/form-dataï¼Œåˆ™è‡ªåŠ¨æ£€æŸ¥æäº¤çš„è¡¨å•æ•°æ®ã€‚å¦‚æœæ­¤å­—ç¬¦ä¸²å…·æœ‰ä»»ä½•å…¶ä»–éç©ºå€¼ï¼Œåˆ™ä¼šæäº¤ä¸åŒç±»å‹çš„æ•°æ®ã€‚è¿™æ˜¯éå¸¸ç½•è§çš„ï¼Œå› ä¸ºå¤§å¤šæ•°æµè§ˆå™¨åªèƒ½ç›´æ¥æäº¤è¡¨å•å’Œæ–‡ä»¶ä¸Šä¼ ã€‚ 
+	static string GetContentType();
+
+	// è·å–Webæµè§ˆå™¨æäº¤çš„åŸå§‹Cookieï¼ˆæµè§ˆå™¨ç«¯æ°¸ä¹…å­˜å‚¨ï¼‰æ•°æ®ã€‚åº”è¯¥ä½¿ç”¨å‡½æ•°GetCookiesï¼Œ GetCookieStringå’Œ GetCookieIntegerï¼Œè€Œä¸æ˜¯ç›´æ¥æ£€æŸ¥è¿™ä¸ªå­—ç¬¦ä¸²ã€‚ 
+	static string GetCookie();
+
+	// è·å–æµè§ˆå™¨å¯ä»¥æ¥å—çš„MIMEå†…å®¹ç±»å‹çš„ç©ºæ ¼åˆ†éš”åˆ—è¡¨ï¼ˆè¯·å‚é˜… cgiHeaderContentTypeï¼ˆï¼‰ï¼‰æˆ–ç©ºå­—ç¬¦ä¸²ã€‚ä¸å¹¸çš„æ˜¯ï¼Œå¤§å¤šæ•°å½“å‰çš„æµè§ˆå™¨å¹¶ä¸æ˜¯ä»¥ä¸€ç§æœ‰ç”¨çš„å½¢å¼æä¾›è¿™ä¸ªå˜é‡ã€‚
+	static string GetAccept();
+
+	// è·å–æ­£åœ¨ä½¿ç”¨çš„æµè§ˆå™¨çš„åç§°ï¼Œå¦‚æœæ­¤ä¿¡æ¯ä¸å¯ç”¨ï¼Œåˆ™ä¸ºç©ºå­—ç¬¦ä¸²ã€‚ 
+	static string GetUserAgent();
+
+	// è·å–ç”¨æˆ·è®¿é—®çš„ä¸Šä¸€é¡µçš„URLã€‚è¿™é€šå¸¸æ˜¯å°†ç”¨æˆ·å¸¦åˆ°æ‚¨çš„ç¨‹åºçš„è¡¨å•çš„URLã€‚è¯·æ³¨æ„ï¼ŒæŠ¥å‘Šæ­¤ä¿¡æ¯å®Œå…¨å–å†³äºæµè§ˆå™¨ï¼Œå¯èƒ½é€‰æ‹©ä¸è¿™æ ·åšã€‚ä½†æ˜¯ï¼Œè¯¥å˜é‡é€šå¸¸æ˜¯å‡†ç¡®çš„ã€‚
+	static string GetReferrer();
+
+	// è·å–æ”¶åˆ°çš„è¡¨å•æˆ–æŸ¥è¯¢æ•°æ®çš„å­—èŠ‚æ•°ã€‚è¯·æ³¨æ„ï¼Œå¦‚æœæäº¤æ˜¯æäº¤è¡¨å•æˆ–æŸ¥è¯¢ï¼Œåº“å°†ç›´æ¥ä»cgiInå’Œ/æˆ–cgiQueryStringè¯»å–å’Œè§£ææ‰€æœ‰ä¿¡æ¯ã€‚åœ¨è¿™ç§æƒ…å†µä¸‹ï¼Œç¨‹åºå‘˜ä¸åº”è¯¥è¿™æ ·åšã€‚
 	static int GetContentLength();
 };
 
 
 /***************************************************************************************************************************************************************************************************/
 
-
-// ¿ØÖÆÆ÷¸¸Àà**************************************************************************************************************************************************************************************
+// æ§åˆ¶å™¨çˆ¶ç±»**************************************************************************************************************************************************************************************
 class CController: public CCgiManager
 {
+private:
+	// æˆå‘˜å˜é‡
+	static map <string, int>            IntegerMap;
+	static map <string, string>         StringMap;
+	static map <string, double>         DoubleMap;
+	static map <string, vector<string> > ListMap;
+
 public:
-	// ¹¹ÔìÓëÕÛ¹¹º¯Êı
+	// æ„é€ ä¸æŠ˜æ„å‡½æ•°
 	CController();
-	CController(char* Type);
 	~CController();
 
-	// µÃµ½ HTML ÄÚÈİ
-	static char* HtmlRead(char* FileName = "index.html");
+	// æ§åˆ¶å™¨åˆå§‹åŒ–
+	static void Initialize();
 
-	// äÖÈ¾²¢Êä³öHTMl
-	static void  HtmlView(char* FileName = "index.html", ...);
+	// ç»‘å®šæ–¹æ³• (åªèƒ½ç»‘å®švoidç±»å‹å¹¶ä¸”å‚æ•°ä¸ºç©ºçš„é™æ€æ–¹æ³•)
+	template<typename T>
+	static void BindFunction(const T& ControllerClass, string FunctionText, PtrFun FunctionName)
+	{
+		// å¤„ç†æ§åˆ¶å™¨åç§°, è½¬ä¸ºå°å†™
+		char* Name = strlowr((char*)(typeid( T ).name()));
+		
+		#ifdef _WIN32
+		// æ›¿æ¢å›ºå®šå­—ç¬¦ä¸²
+		Replace(Name, "class ", "");
+		Replace(Name, "controller", "");
+		Replace(Name, " *", "");
+        #else
+		// æ›¿æ¢å›ºå®šå­—ç¬¦ä¸²
+		Replace(Name, "6", "");
+        #endif
+		
+		// åˆ¤æ–­å¹¶å»æ‰å‰ç¼€
+		string temp = Name;
+		int pos = temp.find(strlowr((char*)controller_prefix.c_str()));
+		if(pos == 0 && pos != -1 && controller_prefix.length() > 0)
+			strncpy(Name, Name + controller_prefix.length(), strlen(Name));
 
-	// Json±àÂë,·µ»ØjsonÊı¾İ
-	char* Json_Encode();
+		// åˆ¤æ–­å¹¶å»æ‰åç¼€
+		pos = temp.rfind(strlowr((char*)controller_suffix.c_str()));
+		if(pos == 0 && pos != -1 && controller_suffix.length() > 0)
+			Name[strlen(Name) - controller_suffix.length()] = '\0';
 
-	// Json ½âÂë
+		// å¾—åˆ°æ§åˆ¶å™¨åç§°
+		string ControllerName(Name);
+
+		// ç»‘å®šæ–¹æ³•
+		FunctionEntry funEntry = {FunctionName, FunctionText};
+		FunTab[ControllerName][FunctionText] = funEntry.pFun;
+	}
+
+	// å¾—åˆ° HTML å†…å®¹
+	static string HtmlRead(string FileName);
+
+	// æ¸²æŸ“å¹¶è¾“å‡ºHTMl
+	static void  HtmlView(string FileName = "index", ...);
+
+	// ç»‘å®šè§†å›¾æ•°æ®
+	static void BindValue(string Name, int    Value);
+	static void BindValue(string Name, string Value);
+	static void BindValue(string Name, double Value);
+	static void BindValue(string Name, vector<string> Value);
+
+	// Jsonç¼–ç ,è¿”å›jsonæ•°æ®
+	string Json_Encode();
+
+	// Json è§£ç 
 	void Json_Decode();
 
-	// Xml±àÂë,·µ»ØxmlÊı¾İ
-	char* Xml_Encode();
+	// Xmlç¼–ç ,è¿”å›xmlæ•°æ®
+	string Xml_Encode();
 
-	// Xml ½âÂë
+	// Xml è§£ç 
 	void Xml_Decode();
 };
 
@@ -413,55 +534,91 @@ public:
 /***************************************************************************************************************************************************************************************************/
 
 
-// Ä£ĞÍ¸¸Àà**************************************************************************************************************************************************************************************
-class CModel: public CSqliteManager
+// æ¨¡å‹çˆ¶ç±»**************************************************************************************************************************************************************************************
+class CModel
 {
 private:
-	// Êı¾İ¿âÀàĞÍ
+	// æ•°æ®åº“ç±»å‹
 	static int Type;
 
-	// ÅäÖÃSqliteÊı¾İ¿â
-	static CSqliteManager m_Sql;
+	// Sqliteæ•°æ®åº“å¯¹è±¡
+	static CSqliteManager m_sqlite;
+
+	// æ•°æ®åº“é…ç½®
+	static void DatabaseConfig(string ConfigFile = "application/database.txt");
 
 public:
-	// ¹¹ÔìÓëÕÛ¹¹º¯Êı
+	// æ„é€ ä¸æŠ˜æ„å‡½æ•°
 	CModel();
 	~CModel();
 
-	// ÅäÖÃÊı¾İ¿â
-	static void DatabaseConfig(char* ConfigFile = "./application/database.config");
+	// åˆå§‹åŒ–çŠ¶æ€
+	static bool Initialize;
 
-	// Ğ´ÈëÊı¾İ
-	static BOOL Save(char* TableName, char* Params);
+	// æ‰§è¡ŒSql (éœ€è‡ªè¡Œæ£€æŸ¥sqlè¯­å¥åˆç†æ€§)
+	static bool Execute(string Sql);
 
-	// É¾³ıÊı¾İ
-	static BOOL Delete(char* TableName, char* Params);
+	// æŸ¥è¯¢Sql (éœ€è‡ªè¡Œæ£€æŸ¥sqlè¯­å¥åˆç†æ€§)
+	static bool Query(string Sql, vector<string> &Result);
 
-	// ¸üĞÂÊı¾İ (µ¥Ìõ)
-	static BOOL UpDate(char* TableName, char* Columns, char* NewData, char* Params);
+	// åˆ›å»ºæ•°æ®è¡¨
+	static bool Create(string TableName, string Params);
 
-	// ¸üĞÂÊı¾İ (ÅúÁ¿)
-	static BOOL UpDate(char* TableName, char* Columns, char* Params);
+	// åˆ é™¤æ•°æ®è¡¨
+	static bool Drop(string TableName);
 
-	// »ñÈ¡Êı¾İ (µ¥Ìõ)
-	static char* Get  (char* TableName, int Col, char* Params, char* Order = "", char* Limit = "", int SortMode = MOD_ASC, BOOL DISTINCT = FALSE, char* COUNT = "", char* COLUMN = "", char* GROUP = "", char* HAVING = "");
+	// ä¿®æ”¹æ•°æ®è¡¨ (Operationå¯é€‰: é‡å‘½åè¡¨:REN_TABLE / æ·»åŠ åˆ—:ADD_COLUMN / åˆ é™¤åˆ—:DEL_COLUMN / ä¿®æ”¹åˆ—:REN_COLUMN)(NewParamsä»…ç”¨äºä¿®æ”¹åˆ—)
+	static bool Alter(string TableName, int Operation, string Params, string NewParams = "");
 
-	// »ñÈ¡Êı¾İ (ÅúÁ¿)
-	static vector<char*> GetAll(char* TableName, int Col, char* Params = "", char* Order = "", char* Limit = "", int SortMode = MOD_ASC, BOOL DISTINCT = FALSE, char* COUNT = "", char* COLUMN = "", char* GROUP = "", char* HAVING = "");
+	// æ£€æŸ¥æ•°æ®è¡¨æ˜¯å¦å­˜åœ¨
+	static bool Exist(string TableName);
 
-	// Í³¼ÆÊı¾İ
-	static int Count(char* TableName, char* Param = ""); 
+	// å†™å…¥æ•°æ®
+	static bool Save(string TableName, string Params);
 
-	// Êı¾İÇóºÍ
-	static int Sum  (char* TableName, char* Column, char* Params = "");
+	// åˆ é™¤æ•°æ®
+	static bool Delete(string TableName, string Params);
 
-	// Êı¾İÇó»ı
-	static int Product(char* TableName, char* Column, char* Params="");
+	// æ›´æ–°æ•°æ® (å•æ¡)
+	static bool UpDate(string TableName, string Columns, string NewData, string Params);
 
-	// Êı¾İÇóÆ½¾ùÊı
-	static int Avg  (char* TableName, char* Column, char* Params = "");
+	// æ›´æ–°æ•°æ® (æ‰¹é‡)
+	static bool UpDate(string TableName, string Columns, string Params);
 
-	// Êı¾İÇóÖĞÎ»Êı
-	static int Mid  (char* TableName, char* Column, char* Params = "");
+	// è·å–æ•°æ® (å•æ¡)
+	static string Get (string TableName, string Column,  string Params,  string Order = "", string Limit = "", int SortMode = MOD_ASC, bool DISTINCT = false, string COUNT = "", string COLUMN = "",string GROUP = "", string HAVING = "");
+
+	// è·å–æ•°æ® (æ‰¹é‡)
+	static vector<string> GetAll(string TableName, string Params = "", string Order = "", string Limit = "", int SortMode = MOD_ASC, bool DISTINCT = false, string COUNT = "", string COLUMN = "", string GROUP = "", string HAVING = "");
+
+	// æ£€æŸ¥æ•°æ®é¡¹æ˜¯å¦å­˜åœ¨
+	static bool Check(string TableName, string Params = "");
+
+	// ç»Ÿè®¡æ•°æ®
+	static int Count(string TableName, string Param = ""); 
+
+	// æ•°æ®æ±‚å’Œ
+	static double Sum  (string TableName, string Column, string Params = "");
+
+	// æ•°æ®æ±‚ç§¯
+	static double Product(string TableName, string Column, string Params="");
+
+	// æ•°æ®æ±‚å¹³å‡æ•°
+	static double Avg  (string TableName, string Column, string Params = "");
+
+	// æ•°æ®æ±‚å‡ºä¼—æ•°
+	static double Plu  (string TableName, string Column, string Params = "");
+
+	// æ•°æ®æ±‚ä¸­ä½æ•°
+	static double Mid  (string TableName, string Column, string Params = "");
+
+	// æ•°æ®æ±‚æœ€å¤§å€¼
+	static double Max  (string TableName, string Column, string Params = "");
+
+	// æ•°æ®æ±‚æœ€å°å€¼
+	static double Min  (string TableName, string Column, string Params = "");
+
+	// æ•°æ®æ±‚éšæœºå€¼
+	static int   Rand  (string TableName, string Column, string Params = "");
 };
 

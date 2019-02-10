@@ -1,7 +1,9 @@
-/* The CGI_C library, by Thomas Boutell, version 2.01. CGI_C is intended
+﻿/* The CGI_C library, by Thomas Boutell, version 2.01. CGI_C is intended
 	to be a high-quality API to simplify CGI programming tasks. */
 
 /* Make sure this is only included once. */
+
+#pragma warning(disable:4996)
 
 #ifndef CGI_C
 #define CGI_C 1

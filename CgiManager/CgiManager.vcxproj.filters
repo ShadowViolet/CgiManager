@@ -9,28 +9,12 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
     </Filter>
-    <Filter Include="资源文件">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="stdafx.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="targetver.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="cgic.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="CgiManager.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="sqlite3.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="SqliteManager.h">
@@ -38,19 +22,16 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="stdafx.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="cgic.c">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="CgiManager.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="sqlite3.c">
+    <ClCompile Include="SqliteManager.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="SqliteManager.cpp">
+    <ClCompile Include="sqlite3\sqlite3secure.c">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
