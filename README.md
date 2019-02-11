@@ -38,7 +38,10 @@ int cgiMain()
 # 编译
 g++  main.cpp -lpthread -lcgi_manager -ldl -o index.cgi
 
+```
+
 即可得到index.cgi 
+
 
 Windows 下 使用 Visual Studio 编译即可。
 
@@ -50,6 +53,7 @@ Windows 下 使用 Visual Studio 编译即可。
 
 4.写一个简单的Hello Word 
 
+```c++
 #include "CgiManager.h"
 
 int cgiMain()
@@ -58,6 +62,7 @@ int cgiMain()
 
     return true;
 }
+```
 
 5.添加CgiManager引用 
 
