@@ -298,14 +298,6 @@ public:
 	// 输出HTTP错误状态代码
 	static void SetStatus(int Status, string Message);
 
-	// 输出内容
-	static void OutPut(string String, ...);
-
-	// 获得输入字符
-	static string InPut(string String);
-	static int    InPut(string String, int    Default);
-	static double InPut(string String, double Default);
-
 	// 转码输出Html
 	static void HtmlEscape(string Name, bool Newlines = true);
 
@@ -461,11 +453,39 @@ private:
 	static map <string, double>         DoubleMap;
 	static map <string, vector<string> > ListMap;
 
+	// 得到 HTML 内容
+	static string HtmlRead(string FileName);
+
 public:
 	// 构造与折构函数
 	CController();
 	~CController();
 
+	// 输出内容
+	static void OutPut(string String, ...);
+
+	// 获得输入字符
+	static string InPut(string String);
+	static int    InPut(string String, int    Default);
+	static double InPut(string String, double Default);
+
+	// 获取文件数据 (返回文件内容)
+	static string InPut(string String, string &FileName, int &FileSize, string &contentType);
+
+	// 设置Cookie
+	static void SetCookie(string Name, string Value);
+	static void SetCookie(string Name, int    Value);
+
+	// 获得Cookie
+	static string GetCookie(string Name);
+	static int    GetCookie(string Name, int Default);
+
+	// 上传文件到服务器
+	static void Upload(string Name, string Path);
+
+	// 从服务器下载文件
+	static void Download(string FileName, string FilePath);
+	
 	// 控制器初始化
 	static void Initialize();
 
@@ -504,9 +524,6 @@ public:
 		FunctionEntry funEntry = {FunctionName, FunctionText};
 		FunTab[ControllerName][FunctionText] = funEntry.pFun;
 	}
-
-	// 得到 HTML 内容
-	static string HtmlRead(string FileName);
 
 	// 渲染并输出HTMl
 	static void  HtmlView(string FileName = "index", ...);

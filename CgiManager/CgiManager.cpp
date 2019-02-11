@@ -921,7 +921,7 @@ void CCgiManager::Record(string Content)
 
 	// 得到文件名
 	char name[1024] = {0}, log[1024] = {0};
-	sprintf(name, "%s/%d-%d-%d.log", log_path.c_str(), lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);//输出结果
+	sprintf(name, "%s/%d-%d-%d.log", log_path.c_str(), lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday);
 
 	// 记录的数据
 	sprintf(log, "%d年%d月%d日 %d时%d分%d秒: %s\r\n", lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec, Content.c_str());
@@ -1262,9 +1262,13 @@ void CCgiManager::Location(string Url)
 // Url跳转
 void CCgiManager::Jump(string Url, bool Visible)
 {
+	// 设置头
+	if(!IsSetHead)
+		SetHead("text/html;charset=" + charset);
+
 	// Url 地址栏会显示改变
 	if(Visible)
-		OutPut("<script>location.href = '%s'</script>", Url.c_str());
+		fprintf(cgiOut, "<script>location.href = '%s'</script>", Url.c_str());
 
 	// Url 地址栏不变(跨域将出现错误)
 	else
@@ -1272,7 +1276,7 @@ void CCgiManager::Jump(string Url, bool Visible)
 		// document.body.innerHTML 
 		string Target = "<script language=javascript> function createXMLHttpRequest(){if(window.XMLHttpRequest){XMLHttpR = new XMLHttpRequest();}else if(window.ActiveXObject){try{XMLHttpR = new ActiveXObject(\"Msxml2.XMLHTTP\");}catch(e){try{XMLHttpR = new ActiveXObject(\"Microsoft.XMLHTTP\");}catch(e){}}}} function sendRequest(url){createXMLHttpRequest();XMLHttpR.open(\"GET\",url,true);XMLHttpR.setRequestHeader(\"Content-Type\",\"text/html;charset=utf-8\");XMLHttpR.onreadystatechange = processResponse;XMLHttpR.send(null);} function processResponse(){if(XMLHttpR.readyState ==4 && XMLHttpR.status == 200){document.body = XMLHttpR.responseText;document.write(XMLHttpR.responseText);}}";
 		Target += "sendRequest(\"%s\");</script>";
-		OutPut(Target.c_str(), Url.c_str());
+		fprintf(cgiOut, Target.c_str(), Url.c_str());
 	}
 }
 
@@ -1299,6 +1303,10 @@ void CCgiManager::HtmlEscape(string Name, bool Newlines)
 
 void CCgiManager::HtmlEscapeData(string Name, int len, bool Newlines)
 {
+	// 设置默认的头
+	if(!IsSetHead)
+		SetHead(return_type + ";charset=" + charset);
+
 	cgiHtmlEscapeData(Name.c_str(), len);
 	if(Newlines)
 	    fprintf(cgiOut, "\n");
@@ -1320,51 +1328,13 @@ void CCgiManager::ValueEscape(string Value, bool Newlines)
 
 void CCgiManager::ValueEscapeData(string Value, int len, bool Newlines)
 {
-	cgiValueEscapeData(Value.c_str(), len);
-	if(Newlines)
-	    fprintf(cgiOut, "\n");
-}
-
-
-// 输出数据
-void CCgiManager::OutPut(string String, ...)
-{
 	// 设置默认的头
 	if(!IsSetHead)
 		SetHead(return_type + ";charset=" + charset);
 
-	//得到变参的起始地址
-	va_list  pArgList;
-	va_start(pArgList, String);
-
-	// 取值并输出数据
-	char s[65535];
-	
-	// 格式化并输出
-	vsnprintf(s, 65535, String.c_str(), pArgList);
-	vfprintf(cgiOut, s, pArgList);
-
-	//收尾
-	va_end(pArgList);
-}
-
-
-// 获得输入字符
-string CCgiManager::InPut(string String)
-{
-	return InPutString(String);
-}
-
-
-int    CCgiManager::InPut(string String, int    Default)
-{
-	return InPutInteger(String, Default);
-}
-
-
-double CCgiManager::InPut(string String, double Default)
-{
-	return InPutDouble(String, Default);
+	cgiValueEscapeData(Value.c_str(), len);
+	if(Newlines)
+	    fprintf(cgiOut, "\n");
 }
 
 
@@ -1454,6 +1424,10 @@ int CCgiManager::InPutInteger(string String, int Default, bool OutPut, bool Newl
 
 	if(OutPut)
 	{
+		// 设置头
+		if (!IsSetHead)
+			SetHead("text/html;charset=" + charset);
+
 		fprintf(cgiOut, "%d", result);
 
 		if(Newlines)
@@ -1472,6 +1446,10 @@ int CCgiManager::InPutIntegerBound(string String, int Min, int Max, int Default,
 
 	if(OutPut)
 	{
+		// 设置头
+		if (!IsSetHead)
+			SetHead("text/html;charset=" + charset);
+
 		fprintf(cgiOut, "%d", result);
 
 		if(Newlines)
@@ -1490,6 +1468,10 @@ double CCgiManager::InPutDouble(string String, double Default, bool OutPut, bool
 
 	if(OutPut)
 	{
+		// 设置头
+		if (!IsSetHead)
+			SetHead("text/html;charset=" + charset);
+
 		fprintf(cgiOut, "%.2lf", result);
 
 		if(Newlines)
@@ -1508,6 +1490,10 @@ double CCgiManager::InPutDoubleBound(string String, double Min, double Max, doub
 
 	if(OutPut)
 	{
+		// 设置头
+		if (!IsSetHead)
+			SetHead("text/html;charset=" + charset);
+
 		fprintf(cgiOut, "%.2lf", result);
 
 		if(Newlines)
@@ -1752,10 +1738,12 @@ bool CCgiManager::InPutFile(string String, string &FileName, int &FileSize, stri
 	}
 
 	// 得到文件大小
-	cgiFormFileSize((char*)String.c_str(), &FileSize);
+	if (cgiFormFileSize((char*)String.c_str(), &FileSize) != cgiFormSuccess)
+		return false;
 
 	// 得到文件类型
-	cgiFormFileContentType((char*)String.c_str(), (char*)contentType.c_str(), contentType.size());
+	if (cgiFormFileContentType((char*)String.c_str(), (char*)contentType.c_str(), contentType.size()) != cgiFormSuccess)
+		return false;
 
 	// 返回
 	return true;
@@ -1778,8 +1766,10 @@ string CCgiManager::ReadFileData(string String, bool OutPut)
 	{
 		// 赋值
 		result = result + buffer;
-		if(OutPut)
+		if (OutPut)
+		{
 			cgiHtmlEscapeData(buffer, got);
+		}
 	}
 
 	// 关闭目标文件
@@ -2018,6 +2008,136 @@ CController::CController()
 CController::~CController()
 {
 
+}
+
+
+// 输出数据
+void CController::OutPut(string String, ...)
+{
+	// 设置默认的头
+	if(!IsSetHead)
+		SetHead(return_type + ";charset=" + charset);
+
+	//得到变参的起始地址
+	va_list  pArgList;
+	va_start(pArgList, String);
+
+	// 取值并输出数据
+	char s[65535];
+	
+	// 格式化并输出
+	vsnprintf(s, 65535, String.c_str(), pArgList);
+	vfprintf(cgiOut, s, pArgList);
+
+	//收尾
+	va_end(pArgList);
+}
+
+
+// 获得输入字符
+string CController::InPut(string String)
+{
+	return InPutString(String);
+}
+
+
+int    CController::InPut(string String, int    Default)
+{
+	return InPutInteger(String, Default);
+}
+
+
+double CController::InPut(string String, double Default)
+{
+	return InPutDouble(String, Default);
+}
+
+
+// 获取上传的文件 (返回文件内容)
+string CController::InPut(string String, string &FileName, int &FileSize, string &contentType)
+{
+	// 解析文件
+	InPutFile(String, FileName, FileSize, contentType);
+
+	// 读取文件
+	return ReadFileData(String);
+}
+
+
+// 设置Cookie
+void CController::SetCookie(string Name, string Value)
+{
+	SetCookieString(Name, Value);
+}
+
+
+void CController::SetCookie(string Name, int Value)
+{
+	SetCoolieInteger(Name, Value);
+}
+
+
+// 获得Cookie
+string CController::GetCookie(string Name)
+{
+	return GetCookieString(Name);
+}
+
+
+int CController::GetCookie(string Name, int Default)
+{
+	return GetCookieInteger(Name, Default);
+}
+
+
+// 上传文件
+void CController::Upload(string Name, string Path)
+{
+	SaveFileData(Name, Path);
+}
+
+
+// 下载文件
+void CController::Download(string FileName, string FilePath)
+{
+	FILE *fp;
+	char filebuf[1024*30];
+	char cmd[512];
+	int len = 0;
+
+	sprintf(cmd, "%s/%s", FilePath.c_str(), FileName.c_str());
+
+	#ifdef _WIN32
+	if(fp=fopen(cmd, "r+b"))
+	{
+		fseek(fp, 0, SEEK_END); //定位到文件末 
+		len = (int)ftell(fp); //文件长度, &sb); //取待下载文件的大小
+		fclose(fp);
+	}
+    #else
+	struct stat sb;
+	stat(cmd, &sb); //取待下载文件的大小
+	len = (int)sb.st_size;
+    #endif
+	
+	//输出HTTP头信息，输出附加下载文件、文件长度以及内容类型
+	fprintf(cgiOut, "Content-Disposition:attachment;filename=%s", FileName.c_str());
+	fprintf(cgiOut, "\r\n"); 
+	fprintf(cgiOut, "Content-Length:%d", len);
+	fprintf(cgiOut, "\r\n");
+	printf("Content-Type:application/octet-stream\r\n");
+	printf("\r\n");
+	sprintf(cmd, "%s/%s", FilePath.c_str(), FileName.c_str());
+
+	if(fp=fopen(cmd, "r+b"))
+	{  
+		//成功打开文件，读取文件内容
+		do{
+			int rs = fread(filebuf, 1, sizeof(filebuf), fp);
+			fwrite(filebuf, rs, 1, stdout);
+		}while(!feof(fp));
+		fclose(fp);
+	}
 }
 
 
@@ -3011,7 +3131,7 @@ string CModel::Get(string TableName, string Column, string Params, string Order,
 
 				// 输出错误
 				CController::DisplayError(message);
-				return false;
+				return "";
 			}
 			else
 			{
