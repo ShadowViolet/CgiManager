@@ -335,16 +335,19 @@ public:
 	static bool InPutCheckboxSingle(string String);
 
 	// 获取一组Checkbox数据(返回所有选中项，若无选中项则返回空)
-    static string InPutCheckboxMultiple(string String);
+    static bool InPutCheckboxMultiple(string String, vector<string> &pResult, char* texts[], int total, int Invalid = 0);
 
 	// 获取一组单选Select数据(返回选中的项)
-	static string InPutSelectSingle(string String , string texts[], int total, int Default = 0);
+	static string InPutSelectSingle(string String , char* texts[], int total, int Default = 0);
 
 	// 获取一组多选Select数据(返回选中的项)
-	static bool InPutSelectMultiple(string String, vector<string> &pResult, string texts[], int total, int Invalid = 0);
+	static bool InPutSelectMultiple(string String, vector<string> &pResult, char* texts[], int total, int Invalid = 0);
 
 	// 获取一组Radio数据(返回选中的项)
 	static string InPutRadio(string String, string Texts[], int Total, int Default = 0);
+
+	// 获取一组数据 (例如Checkbox或Select)
+	static bool InPutMultiple(string String, vector<string> &pResult);
 
 	// 获取Submit数据(提交成功返回真否则返回假)
 	static bool SubmitClicked(string String);
@@ -360,10 +363,10 @@ public:
 	//获取所有表单名称(Name)
 	static string Entries(bool OutPut = false);
 
-	// 将表单数据储存在磁盘里 
+	//  从磁盘里读取表单数据
 	static bool LoadEnvironment(string FileName);
 
-	// 从磁盘里读取表单数据
+	// 将表单数据储存在磁盘里
 	static bool SaveEnvironment(string FileName);
 
 	// 获取文件数据
@@ -464,13 +467,17 @@ public:
 	// 输出内容
 	static void OutPut(string String, ...);
 
-	// 获得输入字符
-	static string InPut(string String);
-	static int    InPut(string String, int    Default);
-	static double InPut(string String, double Default);
+	// 获得输入数据
+	static bool InPut(string Name, bool Default);
+	static string InPut(string Name, int MaxLength = 0, bool Multiple = false);
+	static int    InPut(string Name, int    Default,   int    Min = 0,   int    Max = 0);
+	static double InPut(string Name, double Default, double Min = 0.0, double Max = 0.0);
 
 	// 获取文件数据 (返回文件内容)
-	static string InPut(string String, string &FileName, int &FileSize, string &contentType);
+	static string InPut(string Name, string &FileName, int &FileSize, string &ContentType);
+
+	// 获取一组数据
+	static vector<string> InPut(string Name, char* Default);
 
 	// 设置Cookie
 	static void SetCookie(string Name, string Value);
@@ -481,7 +488,7 @@ public:
 	static int    GetCookie(string Name, int Default);
 
 	// 上传文件到服务器
-	static void Upload(string Name, string Path);
+	static void Upload(string Name, string FilePath);
 
 	// 从服务器下载文件
 	static void Download(string FileName, string FilePath);

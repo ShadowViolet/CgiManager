@@ -366,7 +366,7 @@ char* CCgiManager::Mid(char* dst, char* src, int n, int m) /*n为长度，m为�
     int len = strlen(src);  
     if(n>len) n = len-m;    /*从第m个到最后*/  
     if(m<0) m=0;    /*从第一个开始*/  
-    if(m>len) return NULL;  
+    if(m>len) return "";  
     p += m;  
     while(n--) *(q++) = *(p++);  
     *(q++)='\0'; /*有必要吗？很有必要*/  
@@ -1402,7 +1402,7 @@ string CCgiManager::InPutStringNoNewlines(string String, bool OutPut, bool Newli
 		return result;
 	}
 
-	return NULL;
+	return "";
 }
 
 
@@ -1515,32 +1515,33 @@ bool CCgiManager::InPutCheckboxSingle(string String)
 
 
 // 获取一组Checkbox数据(返回所有选中项，若无选中项则返回空)
-string CCgiManager::InPutCheckboxMultiple(string String)
+bool CCgiManager::InPutCheckboxMultiple(string String, vector<string> &pResult, char* texts[], int total, int Invalid)
 {
-	char **responses;
-	if (cgiFormStringMultiple((char*)String.c_str(), &responses) == cgiFormNotFound) 
-		return NULL;
+	int Choices[65535];
+	
+	//没有选择任何项
+	if(cgiFormCheckboxMultiple((char*)String.c_str(), texts, total, Choices, &Invalid) == cgiFormNotFound)
+		return false;
 	else
 	{
-		// 赋值
-		//char** result = responses;
-		string result((char*)responses);
-
-		// 释放对象
-		cgiStringArrayFree(responses);
-
-		// 返回
-		//return *result;
-		return result;
+		for (int i=0; i < total; i++) 
+		{
+			if (Choices[i])
+			{
+				string result(texts[i]);
+				pResult.push_back(result);
+			}
+		}
+		return true;
 	}
 }
 
 
 // 获取一组单选Select数据(返回选中的项)
-string CCgiManager::InPutSelectSingle(string String, string texts[], int total, int Default)
+string CCgiManager::InPutSelectSingle(string String, char* texts[], int total, int Default)
 {
 	int Choice;
-	cgiFormSelectSingle((char*)String.c_str(), (char**)texts[Choice].c_str(), total, &Choice, Default);
+	cgiFormSelectSingle((char*)String.c_str(), texts, total, &Choice, Default);
 	
 	//char* result = texts[Choice];
 	string result(texts[Choice]);
@@ -1549,15 +1550,13 @@ string CCgiManager::InPutSelectSingle(string String, string texts[], int total, 
 
 
 // 获取一组多选Select数据(若没有选中任何项则返回假，否则返回真)
-bool CCgiManager::InPutSelectMultiple(string String, vector<string> &pResult, string texts[], int total, int Invalid)
+bool CCgiManager::InPutSelectMultiple(string String, vector<string> &pResult, char* texts[], int total, int Invalid)
 {
 	int Choices[65535];
 
 	//没有选择任何项
-	if (cgiFormSelectMultiple((char*)String.c_str(), (char**)texts[0].c_str(), total, Choices, &Invalid) == cgiFormNotFound) 
-	{
+	if (cgiFormSelectMultiple((char*)String.c_str(), texts, total, Choices, &Invalid) == cgiFormNotFound) 
 		return false;
-	}
 	else
 	{
 		for (int i=0; i < total; i++) 
@@ -1581,6 +1580,32 @@ string CCgiManager::InPutRadio(string String, string Texts[], int Total, int Def
 	string result(Texts[Choice]);
 
 	return result;
+}
+
+
+// 获取一组数据 (例如Checkbox或Select)
+bool CCgiManager::InPutMultiple(string String, vector<string> &pResult)
+{
+	char **responses;
+
+	if (cgiFormStringMultiple((char*)String.c_str(), &responses) == cgiFormNotFound) 
+		return false;
+	else
+	{
+		int i = 0;
+		while(responses[i])
+		{
+			string result(responses[i]);
+			pResult.push_back(result);
+			i++;
+		}
+
+		// 释放对象
+		cgiStringArrayFree(responses);
+	}
+
+	//返回
+	return true;
 }
 
 
@@ -1654,7 +1679,7 @@ string CCgiManager::GetCookieString(string Name)
 		return UrlGB2312Decode(value);
 	}
 	else
-		return NULL;
+		return "";
 }
 
 
@@ -1667,7 +1692,7 @@ int CCgiManager::GetCookieInteger(string Name, int Default)
 		return value;
 	}
 	else
-		return NULL;
+		return Default;
 }
 
 
@@ -1677,7 +1702,7 @@ string CCgiManager::Entries(bool OutPut)
 	char **arrays, **arrayStep;
 	if (cgiFormEntries(&arrays) != cgiFormSuccess) 
 	{
-		return NULL;
+		return "";
 	}
 
 	arrayStep = arrays;
@@ -1728,10 +1753,13 @@ bool CCgiManager::SaveEnvironment(string FileName)
 
 
 // 获取文件数据
-bool CCgiManager::InPutFile(string String, string &FileName, int &FileSize, string &contentType)
+bool CCgiManager::InPutFile(string String, string &FileName, int &FileSize, string &ContentType)
 {
+	char name[1024];
+	char contentType[1024];
+
 	// 得到文件名
-	if (cgiFormFileName((char*)String.c_str(), (char*)FileName.c_str(), FileName.size()) != cgiFormSuccess)
+	if (cgiFormFileName((char*)String.c_str(), name, sizeof(name)) != cgiFormSuccess)
 	{
 		// 没有接受到文件数据
 		return false;
@@ -1742,8 +1770,12 @@ bool CCgiManager::InPutFile(string String, string &FileName, int &FileSize, stri
 		return false;
 
 	// 得到文件类型
-	if (cgiFormFileContentType((char*)String.c_str(), (char*)contentType.c_str(), contentType.size()) != cgiFormSuccess)
+	if (cgiFormFileContentType((char*)String.c_str(), contentType, sizeof(contentType)) != cgiFormSuccess)
 		return false;
+
+	// 赋值
+	FileName    = name;
+	ContentType = contentType;
 
 	// 返回
 	return true;
@@ -1759,13 +1791,13 @@ string CCgiManager::ReadFileData(string String, bool OutPut)
 
 	// 打开目标文件
 	if (cgiFormFileOpen((char*)String.c_str(), &File) != cgiFormSuccess)
-		return NULL;
+		return "";
 
 	string result = "";
 	while (cgiFormFileRead(File, buffer, sizeof(buffer), &got) == cgiFormSuccess)
 	{
 		// 赋值
-		result = result + buffer;
+		result += buffer;
 		if (OutPut)
 		{
 			cgiHtmlEscapeData(buffer, got);
@@ -1783,11 +1815,10 @@ string CCgiManager::ReadFileData(string String, bool OutPut)
 // 保存文件数据
 bool CCgiManager::SaveFileData(string String, string FilePath)
 {
-	char buffer[1024];
 	cgiFilePtr File;
-	int got;
-
 	FILE *fp;
+	char buffer[1024];
+	int got;
 
 	#ifdef _WIN32
 	fopen_s(&fp, FilePath.c_str(), "a+");
@@ -1810,10 +1841,10 @@ bool CCgiManager::SaveFileData(string String, string FilePath)
 
 		while (cgiFormFileRead(File, buffer, sizeof(buffer), &got) == cgiFormSuccess)
 		{
-			// 写入数据
-			fputs(buffer, fp);
+			if(got>0)
+				fprintf(fp, buffer);
 		}
-
+		
 		// 关闭目标文件
 		cgiFormFileClose(File);
 	}
@@ -2034,33 +2065,65 @@ void CController::OutPut(string String, ...)
 }
 
 
+bool CController::InPut(string Name, bool Default)
+{
+	return cgiFormCheckboxSingle((char*)Name.c_str()) == cgiFormSuccess ? InPutCheckboxSingle(Name) : Default;
+}
+
+
 // 获得输入字符
-string CController::InPut(string String)
+string CController::InPut(string Name, int MaxLength, bool Multiple)
 {
-	return InPutString(String);
+	if(MaxLength > 0)
+		InPutStringSpaceNeeded(Name, MaxLength);
+
+	if(!Multiple)
+		return InPutStringNoNewlines(Name);
+	else
+		return InPutString(Name);
 }
 
 
-int    CController::InPut(string String, int    Default)
+vector<string> CController::InPut(string Name, char* Default)
 {
-	return InPutInteger(String, Default);
+	vector<string> Result;
+	if(!InPutMultiple(Name, Result))
+	{
+		if(strlen(Default))
+			Result.push_back(Default);
+	}
+
+	// 返回结果
+	return Result;
 }
 
 
-double CController::InPut(string String, double Default)
+int    CController::InPut(string Name, int    Default, int    Min, int    Max)
 {
-	return InPutDouble(String, Default);
+	if(Min > 0 && Max > 0)
+		return InPutIntegerBound(Name, Min, Max, Default);
+	else 
+		return InPutInteger(Name, Default);
+}
+
+
+double CController::InPut(string Name, double Default, double Min, double Max)
+{
+	if(Min > 0.0 && Max > 0.0)
+		return InPutDoubleBound(Name, Min, Max, Default);
+	else
+		return InPutDouble(Name, Default);
 }
 
 
 // 获取上传的文件 (返回文件内容)
-string CController::InPut(string String, string &FileName, int &FileSize, string &contentType)
+string CController::InPut(string Name, string &FileName, int &FileSize, string &contentType)
 {
 	// 解析文件
-	InPutFile(String, FileName, FileSize, contentType);
+	InPutFile(Name, FileName, FileSize, contentType);
 
 	// 读取文件
-	return ReadFileData(String);
+	return ReadFileData(Name);
 }
 
 
@@ -2091,9 +2154,9 @@ int CController::GetCookie(string Name, int Default)
 
 
 // 上传文件
-void CController::Upload(string Name, string Path)
+void CController::Upload(string Name, string FilePath)
 {
-	SaveFileData(Name, Path);
+	SaveFileData(Name, FilePath);
 }
 
 
