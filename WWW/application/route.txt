@@ -1,0 +1,4 @@
+# 伪静态配置: html名称:路径: 如 index:index/index: 表示访问 index.html 等同于访问index/index
+route=
+index:index/index:
+login:login/index:

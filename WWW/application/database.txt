@@ -1,0 +1,20 @@
+# 数据库类型 （sqlite/mysql/sqlserver）
+type=sqlite
+
+# 服务器地址 (sqlite 则是文件路径 {./database/data.db 或 E:\database\data.db 或 data.db})
+hostname=database/data.db
+
+# 端口 (sqlite无需此参数，MySQL默认3306，SQL Server默认1433)
+hostport=
+
+# 数据库名 (sqlite无需此参数)
+database=
+
+# 用户名 (sqlite无需此参数)
+username=
+
+# 密码 (sqlite也可使用密码保护)
+password=
+
+# 数据库编码默认采用utf8
+charset=utf8
