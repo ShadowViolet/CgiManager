@@ -197,6 +197,9 @@ private:
     static char CharToInt(char ch);
     static char StrToBin(char *str);
 
+	// 保存文件
+	static bool SaveFile(const char *data, int len, FILE *fp);
+
 public:
 	// 构造与折构函数
 	CCgiManager();
@@ -370,7 +373,7 @@ public:
 	static bool SaveEnvironment(string FileName);
 
 	// 获取文件数据
-	static bool InPutFile(string String, string &FileName, int &FileSize, string &contentType);
+	static bool InPutFile(string String, string &FileName, int &FileSize, string &ContentType);
 
 	// 读取文件数据
 	static string ReadFileData(string String, bool OutPut = false);
@@ -488,7 +491,7 @@ public:
 	static int    GetCookie(string Name, int Default);
 
 	// 上传文件到服务器
-	static void Upload(string Name, string FilePath);
+	static void Upload(string Name, string FileName, string FilePath);
 
 	// 从服务器下载文件
 	static void Download(string FileName, string FilePath);
@@ -530,6 +533,46 @@ public:
 		// 绑定方法
 		FunctionEntry funEntry = {FunctionName, FunctionText};
 		FunTab[ControllerName][FunctionText] = funEntry.pFun;
+	}
+
+	// 控制器重定向
+	template<typename T>
+	static void Redirect(const T& ControllerClass, string FunctionText)
+	{
+		// 处理控制器名称, 转为小写
+		char* Name = strlowr((char*)(typeid( T ).name()));
+		
+		#ifdef _WIN32
+		// 替换固定字符串
+		Replace(Name, "class ", "");
+		Replace(Name, "controller", "");
+		Replace(Name, " *", "");
+        #else
+		// 替换固定字符串
+		Replace(Name, "6", "");
+        #endif
+		
+		// 判断并去掉前缀
+		string temp = Name;
+		int pos = temp.find(strlowr((char*)controller_prefix.c_str()));
+		if(pos == 0 && pos != -1 && controller_prefix.length() > 0)
+			strncpy(Name, Name + controller_prefix.length(), strlen(Name));
+
+		// 判断并去掉后缀
+		pos = temp.rfind(strlowr((char*)controller_suffix.c_str()));
+		if(pos == 0 && pos != -1 && controller_suffix.length() > 0)
+			Name[strlen(Name) - controller_suffix.length()] = '\0';
+
+		char* Action = strlowr((char*)FunctionText.c_str());
+
+		// 判断并去掉后缀
+		temp = Action;
+		pos = temp.rfind(strlowr((char*)action_suffix.c_str()));
+		if(pos == 0 && pos != -1 && action_suffix.length() > 0)
+			Action[strlen(Action) - action_suffix.length()] = '\0';
+
+		// 执行方法
+		FunTab[Name][Action]();
 	}
 
 	// 渲染并输出HTMl

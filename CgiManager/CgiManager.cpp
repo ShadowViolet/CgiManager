@@ -1794,6 +1794,7 @@ string CCgiManager::ReadFileData(string String, bool OutPut)
 		return "";
 
 	string result = "";
+	char* temp = "";
 	while (cgiFormFileRead(File, buffer, sizeof(buffer), &got) == cgiFormSuccess)
 	{
 		// 赋值
@@ -1812,20 +1813,35 @@ string CCgiManager::ReadFileData(string String, bool OutPut)
 }
 
 
+// 保存文件
+bool CCgiManager::SaveFile(const char *data, int len, FILE *fp)
+{
+	while (len--) 
+	{
+		if (putc((*data), fp) == EOF)
+			return false;
+		
+		data++;
+	}
+
+	return true;
+}
+
+
 // 保存文件数据
 bool CCgiManager::SaveFileData(string String, string FilePath)
 {
-	cgiFilePtr File;
 	FILE *fp;
+	cgiFilePtr File;
 	char buffer[1024];
 	int got;
 
 	#ifdef _WIN32
-	fopen_s(&fp, FilePath.c_str(), "a+");
+	fopen_s(&fp, FilePath.c_str(), "wb+");
 	#endif
 
 	#ifdef __linux
-	fp = fopen(FilePath.c_str(), "a+");
+	fp = fopen(FilePath.c_str(), "wb+");
 	#endif
 
 	if(fp == NULL)
@@ -1834,17 +1850,16 @@ bool CCgiManager::SaveFileData(string String, string FilePath)
 	}
 	else
 	{
-		// 写入数据
 		// 打开目标文件
 		if (cgiFormFileOpen((char*)String.c_str(), &File) != cgiFormSuccess)
 			return false;
 
 		while (cgiFormFileRead(File, buffer, sizeof(buffer), &got) == cgiFormSuccess)
 		{
-			if(got>0)
-				fprintf(fp, buffer);
+			// 保存文件
+			SaveFile(buffer, got, fp);
 		}
-		
+
 		// 关闭目标文件
 		cgiFormFileClose(File);
 	}
@@ -2154,9 +2169,51 @@ int CController::GetCookie(string Name, int Default)
 
 
 // 上传文件
-void CController::Upload(string Name, string FilePath)
+void CController::Upload(string Name, string FileName, string FilePath)
 {
-	SaveFileData(Name, FilePath);
+	// 检查路径
+	#ifdef _WIN32
+	if (!FilePath.empty() && FilePath != "" && 0 != _access(FilePath.c_str(), 0))
+	{
+		// 目标链表
+		vector<string> v;
+
+		// 分割处理
+		Split(FilePath, v, "/");
+
+		// 创建目录
+		string dir;
+		for(int i = 0; i < (int)v.size(); i++)
+		{
+			dir += v.at(i) + "/";
+
+			// 目录不存在，创建目录
+			_mkdir(dir.c_str());
+		}
+	}
+    #else
+	if (!FilePath.empty() && FilePath != "" && 0 != access(FilePath.c_str(), 0))
+	{
+		// 目标链表
+		vector<string> v;
+
+		// 分割处理
+		Split(FilePath, v, "/");
+
+		// 创建目录
+		string dir;
+		for(int i = 0; i < (int)v.size(); i++)
+		{
+			dir += v.at(i) + "/";
+
+			// 目录不存在，创建目录
+			mkdir(log_path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+		}
+	}
+    #endif;
+
+	// 保存文件数据
+	SaveFileData(Name, FilePath + "/" + FileName);
 }
 
 
